@@ -1,2 +1,39 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Blog Title</title><link>https://Meekdai.github.io/Gmeek-template</link><description>Blog description</description><copyright>Blog Title</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://github.githubassets.com/favicons/favicon.svg</url><title>avatar</title><link>https://Meekdai.github.io/Gmeek-template</link></image><lastBuildDate>Thu, 14 Mar 2024 09:17:29 +0000</lastBuildDate><managingEditor>Blog Title</managingEditor><ttl>60</ttl><webMaster>Blog Title</webMaster><item><title>请接着之后的安装步骤执行</title><link>https://Meekdai.github.io/Gmeek-template/post/qing-jie-zhao-zhi-hou-de-an-zhuang-bu-zou-zhi-xing.html</link><description>如果你点击了`READM.md`的链接后，看到了这个页面，请继续之后的安装步骤执行。</description><guid isPermaLink="true">https://Meekdai.github.io/Gmeek-template/post/qing-jie-zhao-zhi-hou-de-an-zhuang-bu-zou-zhi-xing.html</guid><pubDate>Thu, 14 Mar 2024 09:15:10 +0000</pubDate></item><item><title>这是Gmeek模板仓库</title><link>https://Meekdai.github.io/Gmeek-template/post/zhe-shi-Gmeek-mo-ban-cang-ku.html</link><description>通过这个模板创建库，可以大大减少部署Gmeek博客的配置步骤。</description><guid isPermaLink="true">https://Meekdai.github.io/Gmeek-template/post/zhe-shi-Gmeek-mo-ban-cang-ku.html</guid><pubDate>Wed, 20 Dec 2023 07:42:24 +0000</pubDate></item></channel></rss>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Blog Title</title><link>https://LianSeKong.github.io/lizi</link><description>Blog description</description><copyright>Blog Title</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://github.githubassets.com/favicons/favicon.svg</url><title>avatar</title><link>https://LianSeKong.github.io/lizi</link></image><lastBuildDate>Wed, 17 Jul 2024 07:18:05 +0000</lastBuildDate><managingEditor>Blog Title</managingEditor><ttl>60</ttl><webMaster>Blog Title</webMaster><item><title>ProxyLab</title><link>https://LianSeKong.github.io/lizi/post/ProxyLab.html</link><description>&#13;
+&gt; 使用信号量协调对共享资源的访问&#13;
+&gt; Using Semaphores to Coordinate Access to Shared Resources&#13;
+&#13;
+1. 基本思想：线程使用信号量操作来通知另一个线程某个条件已变为真&#13;
+2. Basic idea: Thread uses a semaphore operation to notify another thread that some condition has become true&#13;
+3. 使用计数信号量来跟踪资源状态并通知其他线程&#13;
+4. Use counting semaphores to keep track of resource state and to notify other threads&#13;
+5. 使用互斥锁来保护对资源的访问&#13;
+6. Use mutex to protect access to resource&#13;
+&#13;
+&gt; 两种典型例子&#13;
+&#13;
+1. The Producer-­Consumer Problem &#13;
+2. The Readers-­Writers Problem&#13;
+&#13;
+## The Producer­‐Consumer&#13;
+&#13;
+[[25-sync-advanced.pdf#page=4&amp;selection=0,15,10,26|25-sync-advanced, 页面 4]]&#13;
+&#13;
+## The Readers-­Writers Problem&#13;
+&#13;
+[[25-sync-advanced.pdf#page=11&amp;selection=0,15,8,25|25-sync-advanced, 页面 11]]&#13;
+&#13;
+## 线程安全函数&#13;
+&#13;
+&gt; 如果一个函数在被多个并发线程重复调用时总能产生正确的结果，那么它就是线程安全的&#13;
+&#13;
+## 线程不安全函数&#13;
+&#13;
+1. 使用不安全的函数&#13;
+2. 函数返回静态指针变量     &#13;
+3. 函数不保护共享变量的访问&#13;
+4. 函数维持状态通过多次调用 （操作静态变量）&#13;
+&#13;
+## reentrant &#13;
+&#13;
+&gt; 可重入函数： 属于线程安全函数，不需要同步操作，不访问共享变量。</description><guid isPermaLink="true">https://LianSeKong.github.io/lizi/post/ProxyLab.html</guid><pubDate>Wed, 17 Jul 2024 07:17:38 +0000</pubDate></item></channel></rss>
