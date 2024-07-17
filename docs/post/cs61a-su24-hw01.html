@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html data-color-mode="light" data-dark-theme="dark" data-light-theme="light" lang="zh-CN">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link href='https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/Primer/21.0.7/primer.css' rel='stylesheet' />
+    <link rel="icon" href="https://img.icons8.com/doodle/480/mugman.png"><script>
+        let theme = localStorage.getItem("meek_theme") || "light";
+        document.documentElement.setAttribute("data-color-mode", theme);
+    </script>
+<meta name="description" content="---
+url: https://cs61a.org/hw/hw01/
+title: Homework 1 
+date: 2024-07-17 16:08:34
+tag: 
+banner: 'https://images.unsplash.com/photo-1719749937847-ab76d3e0dbb7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w0Njc1ODd8MHwxfHJhbmRvbXx8fHx8fHwxfHwxNzIxMjAzNjE1fA&ixlib=rb-4.0.3&q=85&fit=crop&w=624&max-h=540'
+banner_icon: 🔖
+---
+sr-annote { all: unset; }
+
+_Due by 11:59pm on Wednesday, June 26  
+截止日期为 6 月 26 日星期三晚上 11：59_
+
+## Instructions 指示
+
+Download [hw01.zip](https://cs61a.org/hw/hw01/hw01.zip). 下载hw01.zip。">
+<meta property="og:title" content="cs61a-su24-hw01">
+<meta property="og:description" content="---
+url: https://cs61a.org/hw/hw01/
+title: Homework 1 
+date: 2024-07-17 16:08:34
+tag: 
+banner: 'https://images.unsplash.com/photo-1719749937847-ab76d3e0dbb7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w0Njc1ODd8MHwxfHJhbmRvbXx8fHx8fHwxfHwxNzIxMjAzNjE1fA&ixlib=rb-4.0.3&q=85&fit=crop&w=624&max-h=540'
+banner_icon: 🔖
+---
+sr-annote { all: unset; }
+
+_Due by 11:59pm on Wednesday, June 26  
+截止日期为 6 月 26 日星期三晚上 11：59_
+
+## Instructions 指示
+
+Download [hw01.zip](https://cs61a.org/hw/hw01/hw01.zip). 下载hw01.zip。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://LianSeKong.github.io/lizi/post/cs61a-su24-hw01.html">
+<meta property="og:image" content="https://img.icons8.com/doodle/480/mugman.png">
+<title>cs61a-su24-hw01</title>
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
+
+</head>
+<style>
+body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;padding: 45px;font-size: 16px;font-family: sans-serif;line-height: 1.25;}
+#header{display:flex;padding-bottom:8px;border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted));margin-bottom: 16px;}
+#footer {margin-top:64px; text-align: center;font-size: small;}
+
+</style>
+
+<style>
+.postTitle{margin: auto 0;font-size:40px;font-weight:bold;}
+.title-right{display:flex;margin:auto 0 0 auto;}
+.title-right .circle{padding: 14px 16px;margin-right:8px;}
+#postBody{border-bottom: 1px solid var(--color-border-default);padding-bottom:36px;}
+#postBody hr{height:2px;}
+#cmButton{height:48px;margin-top:48px;}
+#comments{margin-top:64px;}
+.g-emoji{font-size:24px;}
+@media (max-width: 600px) {
+    body {padding: 8px;}
+    .postTitle{font-size:24px;}
+}
+</style>
+
+
+
+
+<body>
+    <div id="header">
+<h1 class="postTitle">cs61a-su24-hw01</h1>
+<div class="title-right">
+    <a href="https://LianSeKong.github.io/lizi" id="buttonHome" class="btn btn-invisible circle" title="首页">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathHome" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+    <a href="https://github.com/LianSeKong/lizi/issues/2" target="_blank" class="btn btn-invisible circle" title="Issue">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathIssue" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+
+    <a class="btn btn-invisible circle" onclick="modeSwitch();" title="切换主题">
+        <svg class="octicon" width="16" height="16" >
+            <path id="themeSwitch" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+
+</div>
+</div>
+    <div id="content">
+<div class="markdown-body" id="postBody"><hr>
+<h2>url: <a href="https://cs61a.org/hw/hw01/" rel="nofollow">https://cs61a.org/hw/hw01/</a><br>
+title: Homework 1<br>
+date: 2024-07-17 16:08:34<br>
+tag:<br>
+banner: "<a href="https://images.unsplash.com/photo-1719749937847-ab76d3e0dbb7?crop=entropy&amp;cs=srgb&amp;fm=jpg&amp;ixid=M3w0Njc1ODd8MHwxfHJhbmRvbXx8fHx8fHwxfHwxNzIxMjAzNjE1fA&amp;ixlib=rb-4.0.3&amp;q=85&amp;fit=crop&amp;w=624&amp;max-h=540" rel="nofollow">https://images.unsplash.com/photo-1719749937847-ab76d3e0dbb7?crop=entropy&amp;cs=srgb&amp;fm=jpg&amp;ixid=M3w0Njc1ODd8MHwxfHJhbmRvbXx8fHx8fHwxfHwxNzIxMjAzNjE1fA&amp;ixlib=rb-4.0.3&amp;q=85&amp;fit=crop&amp;w=624&amp;max-h=540</a>"<br>
+banner_icon: 🔖</h2>
+<p>sr-annote { all: unset; }</p>
+<p><em>Due by 11:59pm on Wednesday, June 26<br>
+截止日期为 6 月 26 日星期三晚上 11：59</em></p>
+<h2>Instructions 指示</h2>
+<p>Download <a href="https://cs61a.org/hw/hw01/hw01.zip" rel="nofollow">hw01.zip</a>. 下载hw01.zip。</p>
+<p><strong>Submission:</strong> When you are done, submit the assignment by uploading all code files you've edited to Gradescope. You may submit more than once before the deadline; only the final submission will be scored. Check that you have successfully submitted your code on Gradescope. See <a href="https://cs61a.org/lab/lab00#task-c-submitting-the-assignment" rel="nofollow">Lab 0</a> for more instructions on submitting assignments.<br>
+提交：完成后，通过将已编辑的所有代码文件上传到 Gradescope 来提交作业。您可以在截止日期前提交不止一次;只有最终提交的作品才会被打分。检查您是否已在 Gradescope 上成功提交代码。有关提交作业的更多说明，请参阅实验 0。</p>
+<p><strong>Using Ok:</strong> If you have any questions about using Ok, please refer to <a href="https://cs61a.org/articles/using-ok" rel="nofollow">this guide.</a><br>
+使用 Ok：如果您对使用 Ok 有任何疑问，请参阅本指南。</p>
+<p><strong>Readings:</strong> You might find the following references useful:<br>
+阅读材料：您可能会发现以下参考资料很有用：</p>
+<ul>
+<li><a href="https://www.composingprograms.com/pages/11-getting-started.html" rel="nofollow">Section 1.1 第1.1节</a></li>
+<li><a href="https://www.composingprograms.com/pages/12-elements-of-programming.html" rel="nofollow">Section 1.2 第1.2节</a></li>
+<li><a href="https://www.composingprograms.com/pages/13-defining-new-functions.html" rel="nofollow">Section 1.3 第1.3节</a></li>
+<li><a href="https://www.composingprograms.com/pages/14-designing-functions.html" rel="nofollow">Section 1.4 第1.4节</a></li>
+<li><a href="https://www.composingprograms.com/pages/15-control.html" rel="nofollow">Section 1.5 第 1.5 节</a></li>
+</ul>
+<p><strong>Grading:</strong> Homework is graded based on correctness. Each incorrect problem will decrease the total score by one point. <strong>This homework is out of 2 points.</strong><br>
+评分：家庭作业根据正确性进行评分。每道题错，总分就会降低一分。这个作业满分2分。</p>
+<h3>Q1: A Plus Abs B</h3>
+<p>Q1：A +  B的绝对值</p>
+<p>Python's <code class="notranslate">operator</code> module contains two-argument functions such as <code class="notranslate">add</code> and <code class="notranslate">sub</code> for Python's built-in arithmetic operators. For example, <code class="notranslate">add(2, 3)</code> evalutes to 5, just like the expression <code class="notranslate">2 + 3</code>.<br>
+Python <code class="notranslate">operator</code> 的模块包含两个参数函数，例如 <code class="notranslate">add</code> 和 <code class="notranslate">sub</code> for Python 的内置算术运算符。例如， <code class="notranslate">add(2, 3)</code> 求值为 5，就像表达式 <code class="notranslate">2 + 3</code> .</p>
+<p>Fill in the blanks in the following function for adding <code class="notranslate">a</code> to the absolute value of <code class="notranslate">b</code>, without calling <code class="notranslate">abs</code>. You may <strong>not</strong> modify any of the provided code other than the two blanks.<br>
+在以下函数中填空以将 的绝对值相加 <code class="notranslate">a</code> <code class="notranslate">b</code> ，而不调用 <code class="notranslate">abs</code> 。除两个空白之外，您不能修改任何提供的代码。</p>
+<pre class="notranslate"><code class="notranslate">def a_plus_abs_b(a, b):
+    """Return a+abs(b), but without calling abs.
+
+    &gt;&gt;&gt; a_plus_abs_b(2, 3)
+    5
+    &gt;&gt;&gt; a_plus_abs_b(2, -3)
+    5
+    &gt;&gt;&gt; a_plus_abs_b(-1, 4)
+    3
+    &gt;&gt;&gt; a_plus_abs_b(-1, -4)
+    3
+    """
+    if b &lt; 0:
+        f = _____
+    else:
+        f = _____
+    return f(a, b)
+
+</code></pre>
+<p>Use Ok to test your code:<br>
+使用“确定”测试代码：</p>
+<pre class="notranslate"><code class="notranslate">python3 ok -q a_plus_abs_b
+
+</code></pre>
+<p>Use Ok to run the local syntax checker (which checks that you didn't modify any of the provided code other than the two blanks):<br>
+使用 Ok 运行本地语法检查器（检查除两个空格之外是否未修改任何提供的代码）：</p>
+<div class="highlight highlight-source-shell"><pre class="notranslate">python3 ok -q a_plus_abs_b_syntax_check</pre></div>
+<p>🐧Simple problem</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">a_plus_abs_b</span>(<span class="pl-s1">a</span>, <span class="pl-s1">b</span>):
+    <span class="pl-k">if</span> <span class="pl-s1">b</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">0</span>:
+        <span class="pl-s1">f</span> <span class="pl-c1">=</span> <span class="pl-s1">sub</span>
+    <span class="pl-k">else</span>:
+        <span class="pl-s1">f</span> <span class="pl-c1">=</span> <span class="pl-s1">add</span>
+    <span class="pl-k">return</span> <span class="pl-en">f</span>(<span class="pl-s1">a</span>, <span class="pl-s1">b</span>)</pre></div>
+<h3>Q2: Two of Three Q2：三分之二</h3>
+<p>Write a function that takes three <em>positive</em> numbers as arguments and returns the sum of the squares of the two smallest numbers. <strong>Use only a single line for the body of the function.</strong><br>
+编写一个函数，该函数将三个正数作为参数，并返回两个最小数的平方和。仅对函数的正文使用一行。</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">two_of_three</span>(<span class="pl-s1">i</span>, <span class="pl-s1">j</span>, <span class="pl-s1">k</span>):
+    <span class="pl-s">"""Return m*m + n*n, where m and n are the two smallest members of the</span>
+<span class="pl-s">    positive numbers i, j, and k.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; two_of_three(1, 2, 3)</span>
+<span class="pl-s">    5</span>
+<span class="pl-s">    &gt;&gt;&gt; two_of_three(5, 3, 1)</span>
+<span class="pl-s">    10</span>
+<span class="pl-s">    &gt;&gt;&gt; two_of_three(10, 2, 8)</span>
+<span class="pl-s">    68</span>
+<span class="pl-s">    &gt;&gt;&gt; two_of_three(5, 5, 5)</span>
+<span class="pl-s">    50</span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">return</span> <span class="pl-s1">_____</span>
+</pre></div>
+<p><strong>Hint:</strong> Consider using the <code class="notranslate">max</code> or <code class="notranslate">min</code> function:<br>
+提示：考虑使用 <code class="notranslate">max</code> or <code class="notranslate">min</code> 函数：</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c1">&gt;&gt;</span><span class="pl-c1">&gt;</span> <span class="pl-en">max</span>(<span class="pl-c1">1</span>, <span class="pl-c1">2</span>, <span class="pl-c1">3</span>)
+<span class="pl-c1">3</span>
+<span class="pl-c1">&gt;&gt;</span><span class="pl-c1">&gt;</span> <span class="pl-en">min</span>(<span class="pl-c1">-</span><span class="pl-c1">1</span>, <span class="pl-c1">-</span><span class="pl-c1">2</span>, <span class="pl-c1">-</span><span class="pl-c1">3</span>)
+<span class="pl-c1">-</span><span class="pl-c1">3</span></pre></div>
+<p>Use Ok to test your code:<br>
+使用“确定”测试代码：</p>
+<pre class="notranslate"><code class="notranslate">python3 ok -q two_of_three
+</code></pre>
+<p>Use Ok to run the local syntax checker (which checks that you used only a single line for the body of the function):<br>
+使用 Ok 运行本地语法检查器（检查是否仅对函数主体使用了一行）：</p>
+<pre class="notranslate"><code class="notranslate">python3 ok -q two_of_three_syntax_check
+</code></pre>
+<p>​	:penguin:</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">two_of_three</span>(<span class="pl-s1">i</span>, <span class="pl-s1">j</span>, <span class="pl-s1">k</span>):
+    <span class="pl-c"># return min(i * i + j * j, j * j + k * k, i * i + k * k)</span>
+    <span class="pl-k">return</span> <span class="pl-s1">i</span> <span class="pl-c1">*</span> <span class="pl-s1">i</span> <span class="pl-c1">+</span> <span class="pl-s1">j</span> <span class="pl-c1">*</span> <span class="pl-s1">j</span> <span class="pl-c1">+</span> <span class="pl-s1">k</span> <span class="pl-c1">*</span> <span class="pl-s1">k</span> <span class="pl-c1">-</span> <span class="pl-en">max</span>(<span class="pl-s1">i</span>, <span class="pl-s1">j</span>, <span class="pl-s1">k</span>) <span class="pl-c1">*</span> <span class="pl-en">max</span>(<span class="pl-s1">i</span>, <span class="pl-s1">j</span>, <span class="pl-s1">k</span>)</pre></div>
+<h3>Q3: Largest Factor Q3：最大因素</h3>
+<p>Write a function that takes an integer <code class="notranslate">n</code> that is <strong>greater than 1</strong> and returns the largest integer that is smaller than <code class="notranslate">n</code> and evenly divides <code class="notranslate">n</code>.<br>
+编写一个函数，该函数接受一个大于 1 的整数 <code class="notranslate">n</code> ，并返回小于 <code class="notranslate">n</code> 且平均除法的最大 <code class="notranslate">n</code> 整数。</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">largest_factor</span>(<span class="pl-s1">n</span>):
+    <span class="pl-s">"""Return the largest factor of n that is smaller than n.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; largest_factor(15) # factors are 1, 3, 5</span>
+<span class="pl-s">    5</span>
+<span class="pl-s">    &gt;&gt;&gt; largest_factor(80) # factors are 1, 2, 4, 5, 8, 10, 16, 20, 40</span>
+<span class="pl-s">    40</span>
+<span class="pl-s">    &gt;&gt;&gt; largest_factor(13) # factor is 1 since 13 is prime</span>
+<span class="pl-s">    1</span>
+<span class="pl-s">    """</span>
+    <span class="pl-s">"*** YOUR CODE HERE ***"</span></pre></div>
+<p><strong>Hint:</strong> To check if <code class="notranslate">b</code> evenly divides <code class="notranslate">a</code>, use the expression <code class="notranslate">a % b == 0</code>, which can be read as, "the remainder when dividing <code class="notranslate">a</code> by <code class="notranslate">b</code> is 0."<br>
+提示：要检查是否 <code class="notranslate">b</code> 均匀除 <code class="notranslate">a</code> 以，请使用表达 <code class="notranslate">a % b == 0</code> 式，可以理解为“除 <code class="notranslate">a</code> 以 <code class="notranslate">b</code> 时的余数为 0”。</p>
+<p>Use Ok to test your code:<br>
+使用“确定”测试代码：</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">python3</span> <span class="pl-s1">ok</span> <span class="pl-c1">-</span><span class="pl-s1">q</span> <span class="pl-s1">largest_factor</span></pre></div>
+<p>​</p>
+<p>​	:penguin:</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">largest_factor</span>(<span class="pl-s1">n</span>):
+    <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-s1">n</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span>
+    <span class="pl-k">while</span> <span class="pl-s1">i</span> <span class="pl-c1">&gt;=</span> <span class="pl-c1">1</span>:
+        <span class="pl-k">if</span> <span class="pl-s1">n</span> <span class="pl-c1">%</span> <span class="pl-s1">i</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span>: 
+            <span class="pl-k">return</span> <span class="pl-s1">i</span>
+        <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-s1">i</span> <span class="pl-c1">-</span><span class="pl-c1">1</span></pre></div>
+<h3>Q4: Hailstone Q4：冰雹</h3>
+<p>Douglas Hofstadter's Pulitzer-prize-winning book, <em>Gödel, Escher, Bach</em>, poses the following mathematical puzzle.<br>
+道格拉斯·霍夫施塔特（Douglas Hofstadter）的普利策奖获奖著作《哥德尔、埃舍尔、巴赫》提出了以下数学难题。</p>
+<ol>
+<li>Pick a positive integer <code class="notranslate">n</code> as the start.<br>
+选择一个正整数 <code class="notranslate">n</code> 作为开始。</li>
+<li>If <code class="notranslate">n</code> is even, divide it by 2.<br>
+如果 <code class="notranslate">n</code> 是偶数，则将其除以 2。</li>
+<li>If <code class="notranslate">n</code> is odd, multiply it by 3 and add 1.<br>
+如果 <code class="notranslate">n</code> 是奇数，则将其乘以 3 并加 1。</li>
+<li>Continue this process until <code class="notranslate">n</code> is 1.<br>
+继续此过程，直到 <code class="notranslate">n</code> 为 1。</li>
+</ol>
+<p>The number <code class="notranslate">n</code> will travel up and down but eventually end at 1 (at least for all numbers that have ever been tried -- nobody has ever proved that the sequence will terminate). Analogously, a hailstone travels up and down in the atmosphere before eventually landing on earth.<br>
+这个数字 <code class="notranslate">n</code> 会上下移动，但最终以 1 结束（至少对于所有曾经尝试过的数字——没有人证明序列会终止）。类似地，冰雹在最终降落在地球上之前在大气中上下移动。</p>
+<p>This sequence of values of <code class="notranslate">n</code> is often called a Hailstone sequence. Write a function that takes a single argument with formal parameter name <code class="notranslate">n</code>, prints out the hailstone sequence starting at <code class="notranslate">n</code>, and returns the number of steps in the sequence:<br>
+的这个值 <code class="notranslate">n</code> 序列通常称为冰雹序列。编写一个函数，该函数采用具有正式参数名称 <code class="notranslate">n</code> 的单个参数，打印出从 开始 <code class="notranslate">n</code> 的冰雹序列，并返回序列中的步骤数：</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">hailstone</span>(<span class="pl-s1">n</span>):
+    <span class="pl-s">"""Print the hailstone sequence starting at n and return its</span>
+<span class="pl-s">    length.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; a = hailstone(10)</span>
+<span class="pl-s">    10</span>
+<span class="pl-s">    5</span>
+<span class="pl-s">    16</span>
+<span class="pl-s">    8</span>
+<span class="pl-s">    4</span>
+<span class="pl-s">    2</span>
+<span class="pl-s">    1</span>
+<span class="pl-s">    &gt;&gt;&gt; a</span>
+<span class="pl-s">    7</span>
+<span class="pl-s">    &gt;&gt;&gt; b = hailstone(1)</span>
+<span class="pl-s">    1</span>
+<span class="pl-s">    &gt;&gt;&gt; b</span>
+<span class="pl-s">    1</span>
+<span class="pl-s">    """</span>
+    <span class="pl-s">"*** YOUR CODE HERE ***"</span></pre></div>
+<p>Hailstone sequences can get quite long! Try 27. What's the longest you can find?<br>
+冰雹序列可能会很长！尝试 27.你能找到的最长是多少？</p>
+<p>Note that if <code class="notranslate">n == 1</code> initially, then the sequence is one step long.<br>
+请注意，如果 <code class="notranslate">n == 1</code> 最初是，则序列长为一步。<br>
+<strong>Hint:</strong> If you see 4.0 but want just 4, try using floor division <code class="notranslate">//</code> instead of regular division <code class="notranslate">/</code>.<br>
+提示：如果您看到 4.0 但只想要 4，请尝试使用地板划分 <code class="notranslate">//</code> 而不是常规划分 <code class="notranslate">/</code> 。</p>
+<p>Use Ok to test your code:<br>
+使用“确定”测试代码：</p>
+<div class="highlight highlight-source-shell"><pre class="notranslate">python3 ok -q hailstone</pre></div>
+<p><strong>Curious about hailstones or hailstone sequences? Take a look at these articles:<br>
+对冰雹或冰雹序列感到好奇吗？请看这些文章：</strong></p>
+<ul>
+<li>Check out <a href="https://www.nationalgeographic.org/encyclopedia/hail/" rel="nofollow">this article</a> to learn more about how hailstones work!<br>
+查看这篇文章以了解有关冰雹如何工作的更多信息！</li>
+<li>In 2019, there was a major <a href="https://www.quantamagazine.org/mathematician-terence-tao-and-the-collatz-conjecture-20191211/" rel="nofollow">development</a> in understanding how the hailstone conjecture works for most numbers!<br>
+2019 年，在理解冰雹猜想如何适用于大多数数字方面取得了重大进展！</li>
+</ul>
+<p>​	:honeybee:</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">hailstone</span>(<span class="pl-s1">n</span>):
+    <span class="pl-s1">length</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span>
+    <span class="pl-k">while</span> <span class="pl-s1">n</span> <span class="pl-c1">!=</span> <span class="pl-c1">1</span>:
+        <span class="pl-en">print</span>(<span class="pl-s1">n</span>)
+        <span class="pl-k">if</span> <span class="pl-s1">n</span> <span class="pl-c1">%</span> <span class="pl-c1">2</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span>:
+            <span class="pl-s1">n</span> <span class="pl-c1">=</span> <span class="pl-s1">n</span> <span class="pl-c1">//</span><span class="pl-c1">2</span>
+        <span class="pl-k">else</span>:
+            <span class="pl-s1">n</span> <span class="pl-c1">=</span> <span class="pl-c1">3</span> <span class="pl-c1">*</span> <span class="pl-s1">n</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>
+        <span class="pl-s1">length</span> <span class="pl-c1">=</span> <span class="pl-s1">length</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>
+    <span class="pl-en">print</span>(<span class="pl-s1">n</span>)
+    <span class="pl-k">return</span> <span class="pl-s1">length</span></pre></div>
+<h2>Check Your Score Locally 在本地查看您的分数</h2>
+<p>You can locally check your score on each question of this assignment by running<br>
+您可以通过运行</p>
+<pre class="notranslate"><code class="notranslate">python3 ok 
+
+</code></pre>
+<p><strong>This does NOT submit the assignment!</strong> When you are satisfied with your score, submit the assignment to Gradescope to receive credit for it.<br>
+这不会提交作业！当您对自己的分数感到满意时，请将作业提交给 Gradescope 以获得学分。</p>
+<p>Submit this assignment by uploading any files you've edited <strong>to the appropriate Gradescope assignment.</strong> <a href="https://cs61a.org/lab/lab00/#submit-with-gradescope" rel="nofollow">Lab 00</a> has detailed instructions.<br>
+通过将您编辑的任何文件上传到相应的 Gradescope 作业来提交此作业。实验室 00 有详细说明。</p>
+<p>If you completed all problems correctly, you should see that your score is 6.0 in the autograder output by Gradescope. Each homework assignment counts for 2 points, so in this case you will receive the full 2 points for homework. Remember that every incorrect question costs you 1 point, so a 5.0/6.0 on this assignment will translate to a 1.0/2.0 homework grade for this assignment.<br>
+如果您正确完成了所有问题，您应该会在 Gradescope 的自动评分器输出中看到您的分数为 6.0。每份家庭作业计入 2 分，因此在这种情况下，您将获得完整的 2 分。请记住，每个错误的问题都会花费您 1 分，因此此作业的 5.0/6.0 将转换为此作业的 1.0/2.0 家庭作业成绩。</p></div>
+<div style="font-size:small;margin-top:8px;float:right;">转载请注明出处</div>
+
+<button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
+<div class="comments" id="comments"></div>
+
+</div>
+    <div id="footer">Copyright © <span id="year"></span><a href="https://LianSeKong.github.io/lizi"> Lizi </a>
+<p>
+<span id="runday"></span>Powered by <a href="https://meekdai.com/Gmeek.html" target="_blank">Gmeek</a>
+</p>
+
+<script>
+if(""!=""){
+    var now=new Date();
+    var startSite=new Date("");
+    var diff=now.getTime()-startSite.getTime();
+    var diffDay=Math.floor(diff/(1000*60*60*24));
+    document.getElementById("year").innerHTML=now.getFullYear();
+    if(""!=""){document.getElementById("runday").innerHTML=" • "+"网站运行"+diffDay+"天"+" • ";}
+    else{document.getElementById("runday").innerHTML="网站运行"+diffDay+"天"+" • ";}
+}
+</script>
+</div>
+</body>
+<script>
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z'};
+var utterancesLoad=0;
+
+let themeSettings={
+    "dark": ["dark","moon","#00f0ff","dark-blue"],
+    "light": ["light","sun","#ff5000","github-light"],
+    "auto": ["auto","sync","","preferred-color-scheme"]
+};
+function changeTheme(mode, icon, color, utheme){
+    document.documentElement.setAttribute("data-color-mode",mode);
+    document.getElementById("themeSwitch").setAttribute("d",value=IconList[icon]);
+    document.getElementById("themeSwitch").parentNode.style.color=color;
+    if(utterancesLoad==1){utterancesTheme(utheme);}
+}
+function modeSwitch(){
+    let currentMode=document.documentElement.getAttribute('data-color-mode');
+    let newMode = currentMode === "light" ? "dark" : currentMode === "dark" ? "auto" : "light";
+    localStorage.setItem("meek_theme", newMode);
+    if(themeSettings[newMode]){
+        changeTheme(...themeSettings[newMode]);
+    }
+}
+function utterancesTheme(theme){
+    const message={type:'set-theme',theme: theme};
+    const iframe=document.getElementsByClassName('utterances-frame')[0];
+    iframe.contentWindow.postMessage(message,'https://utteranc.es');
+}
+if(themeSettings[theme]){changeTheme(...themeSettings[theme]);}
+console.log("\n %c Gmeek last https://github.com/Meekdai/Gmeek \n\n","padding:5px 0;background:#02d81d;color:#fff");
+</script>
+
+<script>
+document.getElementById("pathHome").setAttribute("d",IconList["home"]);
+document.getElementById("pathIssue").setAttribute("d",IconList["github"]);
+
+
+
+function openComments(){
+    cm=document.getElementById("comments");
+    cmButton=document.getElementById("cmButton");
+    cmButton.innerHTML="loading";
+    span=document.createElement("span");
+    span.setAttribute("class","AnimatedEllipsis");
+    cmButton.appendChild(span);
+
+    script=document.createElement("script");
+    script.setAttribute("src","https://utteranc.es/client.js");
+    script.setAttribute("repo","LianSeKong/lizi");
+    script.setAttribute("issue-term","title");
+    
+    if(localStorage.getItem("meek_theme")=="dark"){script.setAttribute("theme","dark-blue");}
+    else if(localStorage.getItem("meek_theme")=="light") {script.setAttribute("theme","github-light");}
+    else{script.setAttribute("theme","preferred-color-scheme");}
+    
+    script.setAttribute("crossorigin","anonymous");
+    script.setAttribute("async","");
+    cm.appendChild(script);
+
+    int=self.setInterval("iFrameLoading()",200);
+}
+
+function iFrameLoading(){
+    var utterances=document.getElementsByClassName('utterances');
+    if(utterances.length==1){
+        if(utterances[0].style.height!=""){
+            utterancesLoad=1;
+            int=window.clearInterval(int);
+            document.getElementById("cmButton").style.display="none";
+            console.log("utterances Load OK");
+        }
+    }
+}
+</script>
+
+
+</html>
