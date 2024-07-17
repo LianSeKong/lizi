@@ -1,6 +1,8 @@
 {
-    "title":"Blog Title",
-    "subTitle":"Blog description",
-    "avatarUrl":"https://github.githubassets.com/favicons/favicon.svg",
-    "GMEEK_VERSION":"last"
+    "title":"Lizi",
+    "subTitle":"即使代码也是生活！",
+    "avatarUrl":"https://img.icons8.com/doodle/480/mugman.png",
+    "GMEEK_VERSION":"last",
+    "bottomText":"转载请注明出处",
+    "singlePage":["about"],
 }
