@@ -1,5 +1,23 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Lizi</title><link>https://LianSeKong.github.io/lizi</link><description>即是代码也是生活！</description><copyright>Lizi</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://img.icons8.com/doodle/480/mugman.png</url><title>avatar</title><link>https://LianSeKong.github.io/lizi</link></image><lastBuildDate>Wed, 17 Jul 2024 11:41:27 +0000</lastBuildDate><managingEditor>Lizi</managingEditor><ttl>60</ttl><webMaster>Lizi</webMaster><item><title>cs61a-su24-hw02</title><link>https://LianSeKong.github.io/lizi/post/cs61a-su24-hw02.html</link><description>## Instructions&#13;
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Lizi</title><link>https://LianSeKong.github.io/lizi</link><description>即是代码也是生活！</description><copyright>Lizi</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://img.icons8.com/doodle/480/mugman.png</url><title>avatar</title><link>https://LianSeKong.github.io/lizi</link></image><lastBuildDate>Thu, 18 Jul 2024 03:21:14 +0000</lastBuildDate><managingEditor>Lizi</managingEditor><ttl>60</ttl><webMaster>Lizi</webMaster><item><title>cmu15213-fa15-lec25</title><link>https://LianSeKong.github.io/lizi/post/cmu15213-fa15-lec25.html</link><description>&#13;
+# 高级&#13;
+&#13;
+&#13;
+&gt; 使用信号量协调对共享资源的访问&#13;
+&gt; 使用同步可能会让代码执行变慢&#13;
+&#13;
+基本思想：线程使用信号量操作来通知另一个线程某个条件已变为真&#13;
+1. 使用计数信号量来跟踪资源状态并通知其他线程&#13;
+2. 使用互斥锁来保护对资源的访问&#13;
+&#13;
+两种典型例子： &#13;
+1. 生产者-消费者问题&#13;
+2. 读者-写者问题&#13;
+&#13;
+### 生产者-消费者&#13;
+&#13;
+常见的同步模式：&#13;
+1. 生产者等待空位，将项目插入缓冲区，并通知消费者。</description><guid isPermaLink="true">https://LianSeKong.github.io/lizi/post/cmu15213-fa15-lec25.html</guid><pubDate>Thu, 18 Jul 2024 03:19:30 +0000</pubDate></item><item><title>cs61a-su24-hw02</title><link>https://LianSeKong.github.io/lizi/post/cs61a-su24-hw02.html</link><description>## Instructions&#13;
 &#13;
 Download [hw02.zip](https://cs61a.org/hw/hw02/hw02.zip). Inside the archive, you will find a file called [hw02.py](https://cs61a.org/hw/hw02/hw02.py), along with a copy of the `ok` autograder.&#13;
 &#13;
