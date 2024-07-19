@@ -241,11 +241,11 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 
     <span class="pl-s1">listenfd</span> <span class="pl-c1">=</span> <span class="pl-en">Open_listenfd</span>(<span class="pl-s1">argv</span>[<span class="pl-c1">1</span>]);
     <span class="pl-k">while</span> (<span class="pl-c1">1</span>) {
-	    <span class="pl-s1">clientlen</span> <span class="pl-c1">=</span> <span class="pl-k">sizeof</span>(<span class="pl-s1">clientaddr</span>);
-	    <span class="pl-s1">connfd</span> <span class="pl-c1">=</span> <span class="pl-en">Accept</span>(<span class="pl-s1">listenfd</span>, (<span class="pl-smi">SA</span> <span class="pl-c1">*</span>)<span class="pl-c1">&amp;</span><span class="pl-s1">clientaddr</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">clientlen</span>);
+	<span class="pl-s1">clientlen</span> <span class="pl-c1">=</span> <span class="pl-k">sizeof</span>(<span class="pl-s1">clientaddr</span>);
+	<span class="pl-s1">connfd</span> <span class="pl-c1">=</span> <span class="pl-en">Accept</span>(<span class="pl-s1">listenfd</span>, (<span class="pl-smi">SA</span> <span class="pl-c1">*</span>)<span class="pl-c1">&amp;</span><span class="pl-s1">clientaddr</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">clientlen</span>);
         <span class="pl-s1">cnt</span><span class="pl-c1">+=</span><span class="pl-c1">1</span>;
         <span class="pl-k">if</span> (<span class="pl-s1">cnt</span> &gt;= <span class="pl-c1">16</span>) {
-            <span class="pl-c">// 如果子线程还有在运行的，则阻塞  </span>
+            <span class="pl-c">//  回收子线程，避免内存泄漏 </span>
             <span class="pl-k">while</span> (<span class="pl-en">waitpid</span>(<span class="pl-c1">-1</span>, <span class="pl-c1">NULL</span>, <span class="pl-c1">WNOHANG</span>) <span class="pl-c1">&gt;</span> <span class="pl-c1">0</span>) 
             {
                 <span class="pl-s1">cnt</span> <span class="pl-c1">-=</span> <span class="pl-c1">1</span>;
