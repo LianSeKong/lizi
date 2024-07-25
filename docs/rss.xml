@@ -1,5 +1,10 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Lizi</title><link>https://LianSeKong.github.io/lizi</link><description>即是代码也是生活！</description><copyright>Lizi</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://img.icons8.com/doodle/480/mugman.png</url><title>avatar</title><link>https://LianSeKong.github.io/lizi</link></image><lastBuildDate>Sat, 20 Jul 2024 07:29:03 +0000</lastBuildDate><managingEditor>Lizi</managingEditor><ttl>60</ttl><webMaster>Lizi</webMaster><item><title>ubuntu上安装mysql</title><link>https://LianSeKong.github.io/lizi/post/ubuntu-shang-an-zhuang-mysql.html</link><description># Ubuntu Install Mysql&#13;
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Lizi</title><link>https://LianSeKong.github.io/lizi</link><description>即是代码也是生活！</description><copyright>Lizi</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://img.icons8.com/doodle/480/mugman.png</url><title>avatar</title><link>https://LianSeKong.github.io/lizi</link></image><lastBuildDate>Thu, 25 Jul 2024 07:03:04 +0000</lastBuildDate><managingEditor>Lizi</managingEditor><ttl>60</ttl><webMaster>Lizi</webMaster><item><title>Proxy Lab</title><link>https://LianSeKong.github.io/lizi/post/Proxy%20Lab.html</link><description># Proxy Lab&#13;
+&#13;
+&#13;
+&gt;  本实验是CSAPP的最后一个实验，大部分内容都可参考书内样例&#13;
+&gt;  实验主要涉及了IO、多线程、网络编程和并行等方面内容&#13;
+&gt;  Web代理是一个在Web浏览器和终端服务器之间充当中间人的程序。</description><guid isPermaLink="true">https://LianSeKong.github.io/lizi/post/Proxy%20Lab.html</guid><pubDate>Thu, 25 Jul 2024 07:02:35 +0000</pubDate></item><item><title>ubuntu上安装mysql</title><link>https://LianSeKong.github.io/lizi/post/ubuntu-shang-an-zhuang-mysql.html</link><description># Ubuntu Install Mysql&#13;
 &#13;
 1. 更新软件包&#13;
 &#13;

@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html data-color-mode="light" data-dark-theme="dark" data-light-theme="light" lang="zh-CN">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link href='https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/Primer/21.0.7/primer.css' rel='stylesheet' />
+    
+    <link rel="icon" href="https://img.icons8.com/doodle/480/mugman.png"><script>
+        let theme = localStorage.getItem("meek_theme") || "light";
+        document.documentElement.setAttribute("data-color-mode", theme);
+    </script>
+<meta name="description" content="# Proxy Lab
+
+
+>  本实验是CSAPP的最后一个实验，大部分内容都可参考书内样例
+>  实验主要涉及了IO、多线程、网络编程和并行等方面内容
+>  Web代理是一个在Web浏览器和终端服务器之间充当中间人的程序。">
+<meta property="og:title" content="Proxy Lab">
+<meta property="og:description" content="# Proxy Lab
+
+
+>  本实验是CSAPP的最后一个实验，大部分内容都可参考书内样例
+>  实验主要涉及了IO、多线程、网络编程和并行等方面内容
+>  Web代理是一个在Web浏览器和终端服务器之间充当中间人的程序。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://LianSeKong.github.io/lizi/post/Proxy%20Lab.html">
+<meta property="og:image" content="https://img.icons8.com/doodle/480/mugman.png">
+<title>Proxy Lab</title>
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
+
+
+</head>
+<style>
+body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;padding: 45px;font-size: 16px;font-family: sans-serif;line-height: 1.25;}
+#header{display:flex;padding-bottom:8px;border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted));margin-bottom: 16px;}
+#footer {margin-top:64px; text-align: center;font-size: small;}
+
+</style>
+
+<style>
+.postTitle{margin: auto 0;font-size:40px;font-weight:bold;}
+.title-right{display:flex;margin:auto 0 0 auto;}
+.title-right .circle{padding: 14px 16px;margin-right:8px;}
+#postBody{border-bottom: 1px solid var(--color-border-default);padding-bottom:36px;}
+#postBody hr{height:2px;}
+#cmButton{height:48px;margin-top:48px;}
+#comments{margin-top:64px;}
+.g-emoji{font-size:24px;}
+@media (max-width: 600px) {
+    body {padding: 8px;}
+    .postTitle{font-size:24px;}
+}
+</style>
+
+
+
+
+<body>
+    <div id="header">
+<h1 class="postTitle">Proxy Lab</h1>
+<div class="title-right">
+    <a href="https://LianSeKong.github.io/lizi" id="buttonHome" class="btn btn-invisible circle" title="首页">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathHome" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+    <a href="https://github.com/LianSeKong/lizi/issues/7" target="_blank" class="btn btn-invisible circle" title="Issue">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathIssue" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+
+    <a class="btn btn-invisible circle" onclick="modeSwitch();" title="切换主题">
+        <svg class="octicon" width="16" height="16" >
+            <path id="themeSwitch" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+
+</div>
+</div>
+    <div id="content">
+<div class="markdown-body" id="postBody"><h1>Proxy Lab</h1>
+<blockquote>
+<p>本实验是CSAPP的最后一个实验，大部分内容都可参考书内样例<br>
+实验主要涉及了IO、多线程、网络编程和并行等方面内容<br>
+Web代理是一个在Web浏览器和终端服务器之间充当中间人的程序。</p>
+</blockquote>
+<h2>Part I</h2>
+<blockquote>
+<p>设置代理来接受传入的连接，读取和解析请求，将请求转发到web服务器，读取服务器的响应，并将这些响应转发到相应的客户端</p>
+</blockquote>
+<h3>1. 解析URL</h3>
+<blockquote>
+<p>代理服务器需要对传入连接的URL进行解析</p>
+</blockquote>
+<p>URL的组成有如下：</p>
+<ol>
+<li>host / hostname</li>
+<li>pathname</li>
+<li>port</li>
+<li>protocol</li>
+</ol>
+<blockquote>
+<p>例如  <a href="https://github.com/LianSeKong/CSAPP_LABS?a=1&amp;b=2">https://github.com/LianSeKong/CSAPP_LABS?a=1&amp;b=2</a></p>
+</blockquote>
+<ol>
+<li>host / hostname:  <code class="notranslate">github.com</code></li>
+<li>pathname: <code class="notranslate">/LianSeKong/CSAPP_LABS</code></li>
+<li>port: 80</li>
+<li>protocol: <code class="notranslate">https:</code></li>
+<li>search: <code class="notranslate">?a=1&amp;b=2</code></li>
+</ol>
+<h4>定义一个URL对象</h4>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-k">#define</span> <span class="pl-c1">PROTOCOL_SIZE</span> 255
+<span class="pl-k">#define</span> <span class="pl-c1">PORT_SIZE</span> 6
+<span class="pl-k">#define</span> <span class="pl-c1">HOST_SIZE</span> 255
+<span class="pl-k">#define</span> <span class="pl-c1">PATH_NAME_SIZE</span> 4096
+<span class="pl-k">#define</span> <span class="pl-c1">SEARCH_SIZE</span> 4096
+
+
+<span class="pl-k">typedef</span> <span class="pl-k">struct</span> {
+    <span class="pl-smi">char</span> <span class="pl-c1">protocol</span>[<span class="pl-c1">PROTOCOL_SIZE</span>];
+    <span class="pl-smi">char</span> <span class="pl-c1">port</span>[<span class="pl-c1">PORT_SIZE</span>];
+    <span class="pl-smi">char</span> <span class="pl-c1">host</span>[<span class="pl-c1">HOST_SIZE</span>];
+    <span class="pl-smi">char</span> <span class="pl-c1">search</span>[<span class="pl-c1">SEARCH_SIZE</span>];
+    <span class="pl-smi">char</span> <span class="pl-c1">pathname</span>[<span class="pl-c1">PATH_NAME_SIZE</span>];
+} <span class="pl-smi">URL_OBJ</span>, <span class="pl-c1">*</span><span class="pl-smi">URL_OBJ_T</span>;</pre></div>
+<h4>解析URL</h4>
+<blockquote>
+<p>在本实验只需要解析HTTP/1.0协议和GET请求</p>
+</blockquote>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-smi">int</span> <span class="pl-en">parse_uri</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">url</span>, <span class="pl-smi">URL_OBJ_T</span> <span class="pl-s1">url_obj_t</span>) {
+	<span class="pl-c">// 1. 首先判断协议</span>
+	<span class="pl-smi">char</span> <span class="pl-s1">protocol</span>[<span class="pl-c1">PROTOCOL_SIZE</span>] <span class="pl-c1">=</span> <span class="pl-s">"http://"</span>;
+	<span class="pl-c">// 协议不为HTTP，则返回-1</span>
+    <span class="pl-k">if</span> (<span class="pl-en">strncasecmp</span>(<span class="pl-s1">url</span>, <span class="pl-s1">protocol</span>, <span class="pl-en">strlen</span>(<span class="pl-s1">protocol</span>)) <span class="pl-c1">!=</span> <span class="pl-c1">0</span>) {
+        <span class="pl-en">fprintf</span>(<span class="pl-s1">stderr</span>, <span class="pl-s">"Not http protocol: %s\n"</span>, <span class="pl-s1">url</span>);
+        <span class="pl-k">return</span> <span class="pl-c1">-1</span>;
+    }
+    <span class="pl-en">strcpy</span>(<span class="pl-s1">url_obj_t</span><span class="pl-c1">-&gt;</span><span class="pl-c1">protocol</span>, <span class="pl-s">"HTTP/1.0"</span>);
+    <span class="pl-c">// host www.yoojia.com:8080/comment/s-1684</span>
+    <span class="pl-c">// 2. 提取HOST/HOSTNAME</span>
+    <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">host</span> <span class="pl-c1">=</span> <span class="pl-s1">url</span> <span class="pl-c1">+</span> <span class="pl-en">strlen</span>(<span class="pl-s">"http://"</span>);
+    
+    <span class="pl-c">// host不能为0</span>
+    <span class="pl-k">if</span> (<span class="pl-en">strlen</span>(<span class="pl-s1">host</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span>) {
+        <span class="pl-en">fprintf</span>(<span class="pl-s1">stderr</span>, <span class="pl-s">"HOST ERROR: %s\n"</span>, <span class="pl-s1">url</span>);
+        <span class="pl-k">return</span> <span class="pl-c1">-1</span>;
+    }
+    <span class="pl-c">// 3. pathname的起始位置</span>
+    <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">pathname</span> <span class="pl-c1">=</span> <span class="pl-en">strchr</span>(<span class="pl-s1">host</span>, <span class="pl-c1">'/'</span>);
+  	
+	<span class="pl-c">// 4. PORT</span>
+	<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">port</span> <span class="pl-c1">=</span> <span class="pl-en">strchr</span>(<span class="pl-s1">host</span>, <span class="pl-c1">':'</span>);
+	
+	<span class="pl-c">// 复制端口号</span>
+	<span class="pl-k">if</span> (<span class="pl-s1">port</span> <span class="pl-c1">==</span> <span class="pl-c1">NULL</span>) {
+		<span class="pl-c">// 默认端口号</span>
+		<span class="pl-en">strcpy</span>(<span class="pl-s1">url_obj_t</span><span class="pl-c1">-&gt;</span><span class="pl-c1">port</span>, <span class="pl-s">"80"</span>);
+        <span class="pl-c">// 复制HOST</span>
+        <span class="pl-en">strncpy</span>(<span class="pl-s1">url_obj_t</span><span class="pl-c1">-&gt;</span><span class="pl-c1">host</span>, <span class="pl-s1">host</span>, <span class="pl-s1">pathname</span> <span class="pl-c1">-</span> <span class="pl-s1">host</span>);
+	} <span class="pl-k">else</span> {
+		<span class="pl-en">strncpy</span>(<span class="pl-s1">url_obj_t</span><span class="pl-c1">-&gt;</span><span class="pl-c1">port</span>, <span class="pl-s1">port</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>, <span class="pl-s1">pathname</span> <span class="pl-c1">-</span> (<span class="pl-s1">port</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>));
+        <span class="pl-c">// 复制HOST</span>
+        <span class="pl-en">strncpy</span>(<span class="pl-s1">url_obj_t</span><span class="pl-c1">-&gt;</span><span class="pl-c1">host</span>, <span class="pl-s1">host</span>, <span class="pl-s1">port</span> <span class="pl-c1">-</span> <span class="pl-s1">host</span>);
+	}
+
+    <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">search</span> <span class="pl-c1">=</span> <span class="pl-en">strchr</span>(<span class="pl-s1">pathname</span>, <span class="pl-c1">'?'</span>);
+    <span class="pl-k">if</span> (<span class="pl-s1">search</span> <span class="pl-c1">==</span> <span class="pl-c1">NULL</span>) {
+    	<span class="pl-en">strcpy</span>(<span class="pl-s1">url_obj_t</span><span class="pl-c1">-&gt;</span><span class="pl-c1">pathname</span>, <span class="pl-s1">pathname</span>);
+        <span class="pl-en">strcpy</span>(<span class="pl-s1">url_obj_t</span><span class="pl-c1">-&gt;</span><span class="pl-c1">search</span>, <span class="pl-s">""</span>);
+    } <span class="pl-k">else</span> {
+    	<span class="pl-en">strncpy</span>(<span class="pl-s1">url_obj_t</span><span class="pl-c1">-&gt;</span><span class="pl-c1">pathname</span>, <span class="pl-s1">pathname</span>, <span class="pl-s1">search</span> <span class="pl-c1">-</span> <span class="pl-s1">pathname</span>);
+    	<span class="pl-en">strcpy</span>(<span class="pl-s1">url_obj_t</span><span class="pl-c1">-&gt;</span><span class="pl-c1">search</span>, <span class="pl-s1">search</span>);
+    }
+    <span class="pl-k">return</span> <span class="pl-c1">0</span>;
+}</pre></div>
+<h3>转发请求</h3>
+<blockquote>
+<p>请求头具有多行<br>
+每行格式为 <code class="notranslate">KEY:VALUE</code><br>
+每行以<code class="notranslate">\r\n</code>换行<br>
+以空行结束</p>
+</blockquote>
+<p>实验要求</p>
+<blockquote>
+<p>下面四行始终发送，且内容固定</p>
+</blockquote>
+<ol>
+<li>HOST: 为请求端的URL_OBJ的HOST和PORT</li>
+<li>User-Agent: <code class="notranslate">proxy.c 文件头部给出</code></li>
+<li>Connection: false</li>
+<li>Proxy-Connection: false</li>
+</ol>
+<p>解析请求头</p>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-c">// 首先以 : 字符去截取KEY， 然后进行判断，相等则返回0</span>
+<span class="pl-smi">int</span> <span class="pl-en">parse_key</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">hdr_line</span>, <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">key</span>) {
+    <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">hdr_key</span> <span class="pl-c1">=</span> <span class="pl-en">strtok</span>(<span class="pl-s1">hdr_line</span>, <span class="pl-s">":"</span>);
+    <span class="pl-k">return</span> <span class="pl-en">strcasecmp</span>(<span class="pl-s1">hdr_key</span>, <span class="pl-s1">key</span>);
+}</pre></div>
+<p>转发请求头</p>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-smi">void</span> <span class="pl-en">forwarding_hdr</span>(<span class="pl-smi">rio_t</span><span class="pl-c1">*</span> <span class="pl-s1">conn_rio_ptr</span>, <span class="pl-smi">int</span> <span class="pl-s1">end_server_fd</span>, <span class="pl-smi">URL_OBJ_T</span> <span class="pl-s1">url_obj_t</span>) {
+    <span class="pl-c">// 始终发送的请求头， User-Agent、Connection、Proxy-Connection, Host</span>
+    <span class="pl-smi">char</span><span class="pl-c1">*</span> <span class="pl-s1">conn_hdr</span> <span class="pl-c1">=</span> <span class="pl-s">"Connection: close\r\n"</span>;
+    <span class="pl-smi">char</span><span class="pl-c1">*</span> <span class="pl-s1">proxy_conn_hdr</span> <span class="pl-c1">=</span> <span class="pl-s">"Proxy-Connection: close\r\n"</span>;
+    <span class="pl-smi">char</span><span class="pl-c1">*</span> <span class="pl-s1">eof_hdr</span> <span class="pl-c1">=</span> <span class="pl-s">"\r\n"</span>;
+    <span class="pl-smi">char</span><span class="pl-c1">*</span> <span class="pl-s1">host_hdr</span>[<span class="pl-c1">255</span>];
+    <span class="pl-en">strcpy</span>(<span class="pl-s1">host_hdr</span>, <span class="pl-s">"Host: "</span>);
+    <span class="pl-en">strcat</span>(<span class="pl-s1">host_hdr</span>, <span class="pl-s1">url_obj_t</span><span class="pl-c1">-&gt;</span><span class="pl-c1">host</span>);
+    <span class="pl-en">strcat</span>(<span class="pl-s1">host_hdr</span>, <span class="pl-s">":"</span>);
+    <span class="pl-en">strcat</span>(<span class="pl-s1">host_hdr</span>, <span class="pl-s1">url_obj_t</span><span class="pl-c1">-&gt;</span><span class="pl-c1">port</span>);
+    <span class="pl-en">strcat</span>(<span class="pl-s1">host_hdr</span>, <span class="pl-s">"\r\n"</span>);
+    <span class="pl-smi">char</span> <span class="pl-s1">buf</span>[<span class="pl-c1">MAXLINE</span>];
+    <span class="pl-en">Rio_readlineb</span>(<span class="pl-s1">conn_rio_ptr</span>, <span class="pl-s1">buf</span>, <span class="pl-c1">MAXLINE</span>);
+    <span class="pl-en">fputs</span>(<span class="pl-s1">buf</span>, <span class="pl-s1">stdout</span>);
+
+    <span class="pl-k">while</span>(<span class="pl-en">strcmp</span>(<span class="pl-s1">buf</span>, <span class="pl-s1">eof_hdr</span>)) {
+        <span class="pl-smi">int</span> <span class="pl-s1">flag</span> <span class="pl-c1">=</span> <span class="pl-en">parse_key</span>(<span class="pl-s1">buf</span>, <span class="pl-s">"User-Agent"</span>) <span class="pl-c1">&amp;&amp;</span> <span class="pl-en">parse_key</span>(<span class="pl-s1">buf</span>, <span class="pl-s">"Connection"</span>) <span class="pl-c1">&amp;&amp;</span> <span class="pl-en">parse_key</span>(<span class="pl-s1">buf</span>, <span class="pl-s">"Proxy-Connection"</span>) <span class="pl-c1">&amp;&amp;</span> <span class="pl-en">parse_key</span>(<span class="pl-s1">buf</span>, <span class="pl-s">"Host"</span>);
+        <span class="pl-k">if</span> (<span class="pl-s1">flag</span> <span class="pl-c1">!=</span> <span class="pl-c1">0</span>) {
+            <span class="pl-en">Rio_writen</span>(<span class="pl-s1">end_server_fd</span>, <span class="pl-s1">buf</span>, <span class="pl-en">strlen</span>(<span class="pl-s1">buf</span>));
+        }
+        <span class="pl-en">Rio_readlineb</span>(<span class="pl-s1">conn_rio_ptr</span>, <span class="pl-s1">buf</span>, <span class="pl-c1">MAXLINE</span>);
+        <span class="pl-en">fputs</span>(<span class="pl-s1">buf</span>, <span class="pl-s1">stdout</span>);
+    }
+
+    <span class="pl-en">Rio_writen</span>(<span class="pl-s1">end_server_fd</span>, <span class="pl-s1">host_hdr</span>, <span class="pl-en">strlen</span>(<span class="pl-s1">host_hdr</span>));
+    <span class="pl-en">Rio_writen</span>(<span class="pl-s1">end_server_fd</span>, <span class="pl-s1">user_agent_hdr</span>, <span class="pl-en">strlen</span>(<span class="pl-s1">user_agent_hdr</span>));
+    <span class="pl-en">Rio_writen</span>(<span class="pl-s1">end_server_fd</span>, <span class="pl-s1">conn_hdr</span>, <span class="pl-en">strlen</span>(<span class="pl-s1">conn_hdr</span>));
+    <span class="pl-en">Rio_writen</span>(<span class="pl-s1">end_server_fd</span>, <span class="pl-s1">proxy_conn_hdr</span>, <span class="pl-en">strlen</span>(<span class="pl-s1">proxy_conn_hdr</span>));
+    <span class="pl-en">Rio_writen</span>(<span class="pl-s1">end_server_fd</span>, <span class="pl-s1">eof_hdr</span>, <span class="pl-en">strlen</span>(<span class="pl-s1">eof_hdr</span>));
+}</pre></div>
+<p>转发请求</p>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-c">/**</span>
+<span class="pl-c"> * 转发请求帮助函数</span>
+<span class="pl-c"> * client -&gt; proxy -&gt; server</span>
+<span class="pl-c"> * client &lt;- proxy &lt;- server</span>
+<span class="pl-c"> */</span>
+
+<span class="pl-smi">void</span> <span class="pl-en">forwarding</span>(<span class="pl-smi">int</span> <span class="pl-s1">connect_fd</span>)
+{
+    <span class="pl-c">// HTTP请求的信息, 方法： get， url, http/1.1 http/1.0</span>
+    <span class="pl-smi">char</span> <span class="pl-s1">method</span>[<span class="pl-c1">MAXLINE</span>], <span class="pl-s1">url</span>[<span class="pl-c1">MAXLINE</span>], <span class="pl-s1">version</span>[<span class="pl-c1">MAXLINE</span>], <span class="pl-s1">buf</span>[<span class="pl-c1">MAXLINE</span>];
+    <span class="pl-smi">rio_t</span> <span class="pl-s1">connect_rio</span>, <span class="pl-s1">end_server_rio</span>;
+    <span class="pl-en">Rio_readinitb</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">connect_rio</span>, <span class="pl-s1">connect_fd</span>);
+
+    <span class="pl-c">// 此时等待客户端发送请求，挂起</span>
+    <span class="pl-k">if</span> (<span class="pl-en">Rio_readlineb</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">connect_rio</span>, <span class="pl-s1">buf</span>, <span class="pl-c1">MAXLINE</span>) &lt;= <span class="pl-c1">0</span>)
+    {
+        <span class="pl-k">return</span>; <span class="pl-c">// 若为空行或者连接中断则退出</span>
+    }
+
+    <span class="pl-en">fputs</span>(<span class="pl-s1">buf</span>, <span class="pl-s1">stdout</span>);
+    <span class="pl-en">sscanf</span>(<span class="pl-s1">buf</span>, <span class="pl-s">"%s %s %s"</span>, <span class="pl-s1">method</span>, <span class="pl-s1">url</span>, <span class="pl-s1">version</span>);
+    <span class="pl-smi">CacheItem_T</span> <span class="pl-s1">cache_item_ptr</span> <span class="pl-c1">=</span> <span class="pl-en">read_cache</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">cache_list</span>, <span class="pl-s1">url</span>);
+    <span class="pl-k">if</span> (<span class="pl-s1">cache_item_ptr</span>)
+    {
+
+        <span class="pl-en">Rio_writen</span>(<span class="pl-s1">connect_fd</span>, <span class="pl-s1">cache_item_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">data</span>, <span class="pl-s1">cache_item_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">length</span>);
+        <span class="pl-k">return</span>;
+    }
+
+    <span class="pl-smi">URL_OBJ</span> <span class="pl-s1">url_obj</span>;
+    <span class="pl-k">if</span> (<span class="pl-en">parse_uri</span>(<span class="pl-s1">url</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">url_obj</span>) <span class="pl-c1">==</span> <span class="pl-c1">-1</span>)
+    {
+        <span class="pl-k">return</span>;
+    }
+
+    <span class="pl-c">// 建立连接</span>
+    <span class="pl-smi">int</span> <span class="pl-s1">end_server_fd</span> <span class="pl-c1">=</span> <span class="pl-en">Open_clientfd</span>(<span class="pl-s1">url_obj</span>.<span class="pl-c1">host</span>, <span class="pl-s1">url_obj</span>.<span class="pl-c1">port</span>);
+    <span class="pl-c">// 初始化Rio，绑定end_server_fd</span>
+    <span class="pl-en">Rio_readinitb</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">end_server_rio</span>, <span class="pl-s1">end_server_fd</span>);
+    <span class="pl-c">// 请求头设置</span>
+    <span class="pl-smi">char</span> <span class="pl-s1">request_header</span>[<span class="pl-c1">MAXLINE</span>];
+    <span class="pl-en">strcpy</span>(<span class="pl-s1">request_header</span>, <span class="pl-s1">method</span>);           <span class="pl-c">// METHOD</span>
+    <span class="pl-en">strcat</span>(<span class="pl-s1">request_header</span>, <span class="pl-s">" "</span>);              <span class="pl-c">// METHOD</span>
+    <span class="pl-en">strcat</span>(<span class="pl-s1">request_header</span>, <span class="pl-s1">url_obj</span>.<span class="pl-c1">pathname</span>); <span class="pl-c">// METHOD  /PATHNAME</span>
+    <span class="pl-en">strcat</span>(<span class="pl-s1">request_header</span>, <span class="pl-s1">url_obj</span>.<span class="pl-c1">search</span>);   <span class="pl-c">// METHOD  /PATHNAME?A=1&amp;B=2</span>
+    <span class="pl-en">strcat</span>(<span class="pl-s1">request_header</span>, <span class="pl-s">" "</span>);              <span class="pl-c">// METHOD</span>
+    <span class="pl-en">strcat</span>(<span class="pl-s1">request_header</span>, <span class="pl-s1">url_obj</span>.<span class="pl-c1">protocol</span>); <span class="pl-c">// METHOD  /PATHNAME?A=1&amp;B=2 HTTP/1.0</span>
+    <span class="pl-en">strcat</span>(<span class="pl-s1">request_header</span>, <span class="pl-s">"\r\n"</span>);           <span class="pl-c">// METHOD  /PATHNAME?A=1&amp;B=2 HTTP/1.0 /r/n</span>
+    <span class="pl-en">Rio_writen</span>(<span class="pl-s1">end_server_fd</span>, <span class="pl-s1">request_header</span>, <span class="pl-en">strlen</span>(<span class="pl-s1">request_header</span>));
+
+    <span class="pl-en">forwarding_hdr</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">connect_rio</span>, <span class="pl-s1">end_server_fd</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">url_obj</span>);
+    <span class="pl-c">// 获取响应</span>
+
+    <span class="pl-c">// 缓存对象</span>
+    <span class="pl-smi">CacheItem</span> <span class="pl-s1">co</span>;
+    <span class="pl-smi">int</span> <span class="pl-s1">isMaxSize</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>;
+    <span class="pl-c">// 获取响应</span>
+    <span class="pl-k">while</span> (<span class="pl-en">Rio_readlineb</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">end_server_rio</span>, <span class="pl-s1">buf</span>, <span class="pl-c1">MAXLINE</span>))
+    {
+        <span class="pl-en">fputs</span>(<span class="pl-s1">buf</span>, <span class="pl-s1">stdout</span>);
+        <span class="pl-k">if</span> (<span class="pl-s1">isMaxSize</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span> <span class="pl-c1">&amp;&amp;</span> <span class="pl-en">strlen</span>(<span class="pl-s1">buf</span>) <span class="pl-c1">+</span> <span class="pl-s1">co</span>.<span class="pl-c1">length</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">MAX_OBJECT_SIZE</span>)
+        {
+            <span class="pl-en">memcpy</span>(<span class="pl-s1">co</span>.<span class="pl-c1">data</span> <span class="pl-c1">+</span> <span class="pl-s1">co</span>.<span class="pl-c1">length</span>, <span class="pl-s1">buf</span>, <span class="pl-en">strlen</span>(<span class="pl-s1">buf</span>));
+            <span class="pl-s1">co</span>.<span class="pl-c1">length</span> <span class="pl-c1">+=</span> <span class="pl-en">strlen</span>(<span class="pl-s1">buf</span>);
+        }
+        <span class="pl-k">else</span>
+        {
+            <span class="pl-s1">isMaxSize</span> <span class="pl-c1">=</span> <span class="pl-c1">-1</span>;
+        }
+        <span class="pl-en">Rio_writen</span>(<span class="pl-s1">connect_fd</span>, <span class="pl-s1">buf</span>, <span class="pl-en">strlen</span>(<span class="pl-s1">buf</span>));
+        <span class="pl-k">if</span> (<span class="pl-en">strcmp</span>(<span class="pl-s1">buf</span>, <span class="pl-s">"\r\n"</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span>)
+        {
+            <span class="pl-k">break</span>;
+        }
+    }
+
+    <span class="pl-smi">char</span> <span class="pl-s1">fileBuf</span>[<span class="pl-c1">MAX_OBJECT_SIZE</span>];
+    <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">readSize</span> <span class="pl-c1">=</span> <span class="pl-en">Rio_readnb</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">end_server_rio</span>, <span class="pl-s1">fileBuf</span>, <span class="pl-c1">MAX_OBJECT_SIZE</span>);
+    <span class="pl-k">while</span> (<span class="pl-s1">readSize</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">0</span>)
+    {
+        <span class="pl-en">fputs</span>(<span class="pl-s1">fileBuf</span>, <span class="pl-s1">stdout</span>);
+        <span class="pl-en">Rio_writen</span>(<span class="pl-s1">connect_fd</span>, <span class="pl-s1">fileBuf</span>, <span class="pl-s1">readSize</span>);
+        <span class="pl-k">if</span> (<span class="pl-s1">isMaxSize</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span> <span class="pl-c1">&amp;&amp;</span> <span class="pl-s1">co</span>.<span class="pl-c1">length</span> <span class="pl-c1">+</span> <span class="pl-s1">readSize</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">MAX_OBJECT_SIZE</span>)
+        {
+            <span class="pl-en">memcpy</span>(<span class="pl-s1">co</span>.<span class="pl-c1">data</span> <span class="pl-c1">+</span> <span class="pl-s1">co</span>.<span class="pl-c1">length</span>, <span class="pl-s1">fileBuf</span>, <span class="pl-s1">readSize</span>);
+            <span class="pl-s1">co</span>.<span class="pl-c1">length</span> <span class="pl-c1">+=</span> <span class="pl-s1">readSize</span>;
+        }
+        <span class="pl-k">else</span>
+        {
+            <span class="pl-s1">isMaxSize</span> <span class="pl-c1">=</span> <span class="pl-c1">-1</span>;
+        }
+        <span class="pl-s1">readSize</span> <span class="pl-c1">=</span> <span class="pl-en">Rio_readnb</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">end_server_rio</span>, <span class="pl-s1">fileBuf</span>, <span class="pl-c1">MAX_OBJECT_SIZE</span>);
+    }
+
+    <span class="pl-k">if</span> (<span class="pl-s1">isMaxSize</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span>)
+    {
+        <span class="pl-s1">co</span>.<span class="pl-c1">count</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span>;
+        <span class="pl-en">strcpy</span>(<span class="pl-s1">co</span>.<span class="pl-c1">url</span>, <span class="pl-s1">url</span>);
+        <span class="pl-en">write_cache</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">cache_list</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">co</span>);
+    }
+    <span class="pl-en">Close</span>(<span class="pl-s1">end_server_fd</span>);
+}</pre></div>
+<h2>PartII 多线程</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-smi">void</span> <span class="pl-c1">*</span><span class="pl-en">thread</span>(<span class="pl-smi">void</span> <span class="pl-c1">*</span><span class="pl-s1">vargp</span>)
+{
+    <span class="pl-c">// 分离主进程。自动回收</span>
+    <span class="pl-en">Pthread_detach</span>(<span class="pl-en">pthread_self</span>());
+    <span class="pl-smi">int</span> <span class="pl-s1">connfd</span> <span class="pl-c1">=</span> <span class="pl-c1">*</span>(<span class="pl-smi">int</span> <span class="pl-c1">*</span>)<span class="pl-s1">vargp</span>;
+    <span class="pl-en">Free</span>(<span class="pl-s1">vargp</span>);
+    <span class="pl-en">forwarding</span>(<span class="pl-s1">connfd</span>);
+    <span class="pl-en">Close</span>(<span class="pl-s1">connfd</span>);
+    <span class="pl-k">return</span> <span class="pl-c1">NULL</span>;
+}
+<span class="pl-smi">int</span> <span class="pl-en">main</span>(<span class="pl-smi">int</span> <span class="pl-s1">argc</span>, <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-c1">*</span><span class="pl-s1">argv</span>)
+{
+    <span class="pl-c">// 规范命令行参数</span>
+    <span class="pl-k">if</span> (<span class="pl-s1">argc</span> <span class="pl-c1">!=</span> <span class="pl-c1">2</span>)
+    {
+        <span class="pl-en">fprintf</span>(<span class="pl-s1">stderr</span>, <span class="pl-s">"usage: %s &lt;port&gt;\n"</span>, <span class="pl-s1">argv</span>[<span class="pl-c1">0</span>]);
+        <span class="pl-en">exit</span>(<span class="pl-c1">1</span>);
+    }
+    <span class="pl-c">// 初始化缓存</span>
+    <span class="pl-en">initCache</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">cache_list</span>);
+    <span class="pl-c">// 客户端发起的链接文件描述符， 代理服务器的链接文件描述符</span>
+    <span class="pl-smi">int</span> <span class="pl-s1">proxy_fd</span>;
+    <span class="pl-smi">char</span> <span class="pl-s1">hostname</span>[<span class="pl-c1">MAXLINE</span>], <span class="pl-s1">port</span>[<span class="pl-c1">MAXLINE</span>];
+    <span class="pl-k">struct</span> <span class="pl-smi">sockaddr_storage</span> <span class="pl-s1">client_addr</span>; <span class="pl-c">// 兼容socket地址</span>
+    <span class="pl-smi">socklen_t</span> <span class="pl-s1">client_len</span> <span class="pl-c1">=</span> <span class="pl-k">sizeof</span>(<span class="pl-s1">client_addr</span>);
+    <span class="pl-s1">proxy_fd</span> <span class="pl-c1">=</span> <span class="pl-en">Open_listenfd</span>(<span class="pl-s1">argv</span>[<span class="pl-c1">1</span>]); <span class="pl-c">// 代理服务器的文件描述符</span>
+    <span class="pl-k">while</span> (<span class="pl-c1">1</span>)
+    {
+        <span class="pl-c">// 阻塞，等待连接，转换socket地址为通用结构</span>
+        <span class="pl-smi">int</span> <span class="pl-c1">*</span><span class="pl-s1">connect_fd</span> <span class="pl-c1">=</span> (<span class="pl-smi">int</span> <span class="pl-c1">*</span>)<span class="pl-en">Malloc</span>(<span class="pl-k">sizeof</span>(<span class="pl-smi">int</span>));
+        <span class="pl-c1">*</span><span class="pl-s1">connect_fd</span> <span class="pl-c1">=</span> <span class="pl-en">Accept</span>(<span class="pl-s1">proxy_fd</span>, (<span class="pl-smi">SA</span> <span class="pl-c1">*</span>)<span class="pl-c1">&amp;</span><span class="pl-s1">client_addr</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">client_len</span>);
+        <span class="pl-c">// 打印对应的连接客户端信息</span>
+        <span class="pl-en">Getnameinfo</span>((<span class="pl-smi">SA</span> <span class="pl-c1">*</span>)<span class="pl-c1">&amp;</span><span class="pl-s1">client_addr</span>, <span class="pl-s1">client_len</span>, <span class="pl-s1">hostname</span>, <span class="pl-c1">MAXLINE</span>,
+                    <span class="pl-s1">port</span>, <span class="pl-c1">MAXLINE</span>, <span class="pl-c1">0</span>);
+        <span class="pl-en">printf</span>(<span class="pl-s">"Accepted connection from (%s, %s)\n"</span>, <span class="pl-s1">hostname</span>, <span class="pl-s1">port</span>);
+        <span class="pl-smi">pthread_t</span> <span class="pl-s1">tid</span>;
+        <span class="pl-en">Pthread_create</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">tid</span>, <span class="pl-c1">NULL</span>, <span class="pl-s1">thread</span>, (<span class="pl-smi">void</span> <span class="pl-c1">*</span>)<span class="pl-s1">connect_fd</span>);
+    }
+}
+</pre></div>
+<h2>PartIII 缓存</h2>
+<ol>
+<li>代理的整个缓存大小:</li>
+</ol>
+<blockquote>
+<p>存储实际web对象的字节数<br>
+无关字节则忽略</p>
+</blockquote>
+<div class="highlight highlight-source-c"><pre class="notranslate"> <span class="pl-k">#define</span> <span class="pl-c1">MAX_CACHE_SIZE</span> 1049000 </pre></div>
+<ol start="2">
+<li>最大web对象大小</li>
+</ol>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-k">#define</span> <span class="pl-c1">MAX_OBJECT_SIZE</span> 102400</pre></div>
+<ol start="3">
+<li>
+<p>最大数据量 <code class="notranslate">MAX_CACHE_SIZE + T * MAX_OBJECT_SIZE</code></p>
+</li>
+<li>
+<p>T为连接数</p>
+</li>
+<li>
+<p>缓存策略： <code class="notranslate">实现正确缓存的最简单方法是为每个活动连接分配一个缓冲区，并在从服务器接收到数据时累积数据。如果缓冲区的大小超过最大对象大小，则可以丢弃缓冲区。如果在超过最大对象大小之前读取了整个web服务器的响应，则可以缓存该对象。</code></p>
+</li>
+<li>
+<p>驱逐策略： <code class="notranslate">LRU</code></p>
+</li>
+<li>
+<p>可以多个读者，但只能一个写者</p>
+</li>
+<li>
+<p>代码</p>
+</li>
+</ol>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-k">#define</span> <span class="pl-c1">MAX_CACHE_SIZE</span> 1049000  // 最大缓存
+<span class="pl-k">#define</span> <span class="pl-c1">MAX_OBJECT_SIZE</span> 102400  // 最大对象缓存
+<span class="pl-k">#define</span> <span class="pl-c1">MAX_CAHCE_NUM</span> 10        //  最大缓存数量
+<span class="pl-k">#define</span> <span class="pl-c1">MAX_READ_NUM</span> 10			// 最大同时读者数量
+<span class="pl-smi">sem_t</span> <span class="pl-s1">mutex</span>; <span class="pl-c">// 互斥锁，用于防止竞争</span>
+<span class="pl-smi">sem_t</span> <span class="pl-s1">w</span>; <span class="pl-c">// 写锁</span>
+<span class="pl-smi">sem_t</span> <span class="pl-s1">r</span>; <span class="pl-c">// 读锁</span>
+<span class="pl-c">// 初始化缓存</span>
+<span class="pl-smi">void</span> <span class="pl-en">initCache</span>(<span class="pl-smi">CacheList_T</span> <span class="pl-s1">cache_list_ptr</span>)
+{
+    <span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">length</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>;
+    <span class="pl-en">Sem_init</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">w</span>, <span class="pl-c1">0</span>, <span class="pl-c1">1</span>);
+    <span class="pl-en">Sem_init</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">r</span>, <span class="pl-c1">0</span>, <span class="pl-c1">MAX_READ_NUM</span>);
+    <span class="pl-en">Sem_init</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">mutex</span>, <span class="pl-c1">0</span>, <span class="pl-c1">1</span>);
+}
+
+<span class="pl-smi">void</span> <span class="pl-en">write_cache</span>(<span class="pl-smi">CacheList_T</span> <span class="pl-s1">cache_list_ptr</span>, <span class="pl-smi">CacheItem_T</span> <span class="pl-s1">cache_item_ptr</span>)
+{
+
+    <span class="pl-en">P</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">w</span>); <span class="pl-c">// 获取写互斥锁，如果正在写入，则等待。</span>
+    <span class="pl-c">// 等待所有读者读取完毕</span>
+    <span class="pl-k">for</span> (<span class="pl-smi">size_t</span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">MAX_READ_NUM</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+    {
+        <span class="pl-en">P</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">r</span>);
+    }
+    <span class="pl-c">// 未写满缓存</span>
+    <span class="pl-k">if</span> (<span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">length</span> <span class="pl-c1">!=</span> <span class="pl-c1">MAX_CAHCE_NUM</span>)
+    {
+        <span class="pl-c">// 复制缓存</span>
+        <span class="pl-en">memcpy</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">list</span>[(<span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">length</span>)<span class="pl-c1">++</span>], <span class="pl-s1">cache_item_ptr</span>, <span class="pl-k">sizeof</span>(<span class="pl-s1">CacheItem</span>));
+    }
+    <span class="pl-k">else</span>
+    {
+        <span class="pl-c">// 找出最小使用数， LRU， count会存在溢出问题</span>
+        <span class="pl-smi">int</span> <span class="pl-s1">used_c</span> <span class="pl-c1">=</span> <span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">list</span>[<span class="pl-c1">0</span>].<span class="pl-c1">count</span>;
+        <span class="pl-k">for</span> (<span class="pl-smi">size_t</span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">length</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+        {
+            <span class="pl-k">if</span> (<span class="pl-s1">used_c</span> <span class="pl-c1">&gt;</span> <span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">list</span>[<span class="pl-s1">i</span>].<span class="pl-c1">count</span>)
+            {
+                <span class="pl-s1">used_c</span> <span class="pl-c1">=</span> <span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">list</span>[<span class="pl-s1">i</span>].<span class="pl-c1">count</span>;
+            }
+        }
+        <span class="pl-k">for</span> (<span class="pl-smi">size_t</span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">length</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+        {
+            <span class="pl-k">if</span> (<span class="pl-s1">used_c</span> <span class="pl-c1">==</span> <span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">list</span>[<span class="pl-s1">i</span>].<span class="pl-c1">count</span>)
+            {
+                <span class="pl-c">// 将最近没使用的数据给替换掉</span>
+                <span class="pl-en">memcpy</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">list</span>[<span class="pl-s1">i</span>], <span class="pl-s1">cache_item_ptr</span>, <span class="pl-k">sizeof</span>(<span class="pl-s1">CacheItem</span>));
+                <span class="pl-k">break</span>;
+            }
+        }
+    }
+    <span class="pl-c">// 返回互斥锁</span>
+    <span class="pl-k">for</span> (<span class="pl-smi">size_t</span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">MAX_READ_NUM</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+    {
+        <span class="pl-en">V</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">r</span>);
+    }
+    <span class="pl-en">V</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">w</span>); <span class="pl-c">// 返回写的互斥锁</span>
+}
+
+<span class="pl-smi">CacheItem_T</span> <span class="pl-en">read_cache</span>(<span class="pl-smi">CacheList_T</span> <span class="pl-s1">cache_list_ptr</span>, <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">url</span>)
+{
+    <span class="pl-en">P</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">r</span>);
+    <span class="pl-k">for</span> (<span class="pl-smi">size_t</span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">length</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+    {
+        <span class="pl-k">if</span> (<span class="pl-en">strcmp</span>(<span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">list</span>[<span class="pl-s1">i</span>].<span class="pl-c1">url</span>, <span class="pl-s1">url</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span>)
+        {
+            <span class="pl-en">P</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">mutex</span>); <span class="pl-c">// 防止多个读取相同内容时候出现竞争问题</span>
+            <span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">list</span>[<span class="pl-s1">i</span>].<span class="pl-c1">count</span> <span class="pl-c1">+=</span> <span class="pl-c1">1</span>;
+            <span class="pl-en">V</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">mutex</span>);
+            <span class="pl-en">V</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">r</span>);
+            <span class="pl-k">return</span> <span class="pl-c1">&amp;</span><span class="pl-s1">cache_list_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">list</span>[<span class="pl-s1">i</span>];
+        }
+    }
+    <span class="pl-en">V</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">r</span>);
+    <span class="pl-k">return</span> <span class="pl-c1">NULL</span>;
+    }</pre></div></div>
+<div style="font-size:small;margin-top:8px;float:right;">转载请注明出处</div>
+
+<button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
+<div class="comments" id="comments"></div>
+
+</div>
+    <div id="footer"><div id="footer1">Copyright © <span id="copyrightYear"></span> <a href="https://LianSeKong.github.io/lizi">Lizi</a></div>
+<div id="footer2">
+    <span id="runday"></span><span>Powered by <a href="https://meekdai.com/Gmeek.html" target="_blank">Gmeek</a></span>
+</div>
+
+<script>
+var now=new Date();
+document.getElementById("copyrightYear").innerHTML=now.getFullYear();
+
+if(""!=""){
+    var startSite=new Date("");
+    var diff=now.getTime()-startSite.getTime();
+    var diffDay=Math.floor(diff/(1000*60*60*24));
+    document.getElementById("runday").innerHTML="网站运行"+diffDay+"天"+" • ";
+}
+</script></div>
+</body>
+<script>
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z'};
+var utterancesLoad=0;
+
+let themeSettings={
+    "dark": ["dark","moon","#00f0ff","dark-blue"],
+    "light": ["light","sun","#ff5000","github-light"],
+    "auto": ["auto","sync","","preferred-color-scheme"]
+};
+function changeTheme(mode, icon, color, utheme){
+    document.documentElement.setAttribute("data-color-mode",mode);
+    document.getElementById("themeSwitch").setAttribute("d",value=IconList[icon]);
+    document.getElementById("themeSwitch").parentNode.style.color=color;
+    if(utterancesLoad==1){utterancesTheme(utheme);}
+}
+function modeSwitch(){
+    let currentMode=document.documentElement.getAttribute('data-color-mode');
+    let newMode = currentMode === "light" ? "dark" : currentMode === "dark" ? "auto" : "light";
+    localStorage.setItem("meek_theme", newMode);
+    if(themeSettings[newMode]){
+        changeTheme(...themeSettings[newMode]);
+    }
+}
+function utterancesTheme(theme){
+    const message={type:'set-theme',theme: theme};
+    const iframe=document.getElementsByClassName('utterances-frame')[0];
+    iframe.contentWindow.postMessage(message,'https://utteranc.es');
+}
+if(themeSettings[theme]){changeTheme(...themeSettings[theme]);}
+console.log("\n %c Gmeek last https://github.com/Meekdai/Gmeek \n","padding:5px 0;background:#02d81d;color:#fff");
+</script>
+
+<script>
+document.getElementById("pathHome").setAttribute("d",IconList["home"]);
+document.getElementById("pathIssue").setAttribute("d",IconList["github"]);
+
+
+
+function openComments(){
+    cm=document.getElementById("comments");
+    cmButton=document.getElementById("cmButton");
+    cmButton.innerHTML="loading";
+    span=document.createElement("span");
+    span.setAttribute("class","AnimatedEllipsis");
+    cmButton.appendChild(span);
+
+    script=document.createElement("script");
+    script.setAttribute("src","https://utteranc.es/client.js");
+    script.setAttribute("repo","LianSeKong/lizi");
+    script.setAttribute("issue-term","title");
+    
+    if(localStorage.getItem("meek_theme")=="dark"){script.setAttribute("theme","dark-blue");}
+    else if(localStorage.getItem("meek_theme")=="light") {script.setAttribute("theme","github-light");}
+    else{script.setAttribute("theme","preferred-color-scheme");}
+    
+    script.setAttribute("crossorigin","anonymous");
+    script.setAttribute("async","");
+    cm.appendChild(script);
+
+    int=self.setInterval("iFrameLoading()",200);
+}
+
+function iFrameLoading(){
+    var utterances=document.getElementsByClassName('utterances');
+    if(utterances.length==1){
+        if(utterances[0].style.height!=""){
+            utterancesLoad=1;
+            int=window.clearInterval(int);
+            document.getElementById("cmButton").style.display="none";
+            console.log("utterances Load OK");
+        }
+    }
+}
+</script>
+
+
+</html>
