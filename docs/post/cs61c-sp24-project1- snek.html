@@ -1,0 +1,2487 @@
+<!DOCTYPE html>
+<html data-color-mode="light" data-dark-theme="dark" data-light-theme="light" lang="zh-CN">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link href='https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/Primer/21.0.7/primer.css' rel='stylesheet' />
+    
+    <link rel="icon" href="https://img.icons8.com/doodle/480/mugman.png"><script>
+        let theme = localStorage.getItem("meek_theme") || "light";
+        document.documentElement.setAttribute("data-color-mode", theme);
+    </script>
+<meta name="description" content="# Snake
+
+> creating a playable snake game
+
+## Conceptual Overview
+
+### Snakes
+
+A snake game can be represented by a grid of characters. 
+
+The grid contains walls, fruits, and one or more snakes. 
+
+An example of a game is shown below:
+
+```javascript
+##############
+#            #
+#    dv      #
+#     v   #  #
+#     v   #  #
+#   s >>D #  #
+#   v     #  #
+# *A<  *  #  #
+#            #
+##############
+```
+
+The grid has the following special characters:
+
+*   `#` denotes a wall.
+*   (space character) denotes an empty space.
+*   `*` denotes a fruit.
+*   `wasd` denotes the tail of a snake.
+*   `^<v>` denotes the body of a snake.
+*   `WASD` denotes the head of a snake.
+*   `x` denotes the head of a snake that has died.
+
+Each character of the snake tells you what direction the snake is currently heading in:
+
+*   `w`, `W`, or `^` denotes up
+*   `a`, `A`, or `<` denotes left
+*   `s`, `S`, or `v` denotes down
+*   `d`, `D`, or `>` denotes right
+
+At each time step, each snakes moves according to the following rules:
+
+*   Each snake moves one step in the direction of its head.
+*   If the head crashes into the body of a snake or a wall, the snake dies and stops moving. When a snake dies, the head is replaced with an `x`.
+*   If the head moves into a fruit, the snake eats the fruit and grows by 1 unit in length. Each time fruit is consumed, a new fruit is generated on the board.
+
+In the example above, after one time step, the board will look like this:
+
+```
+##############
+#         *  #
+#     s      #
+#     v   #  #
+#     v   #  #
+#   s >>>D#  #
+#   v     #  #
+# A<<  *  #  #
+#            #
+##############
+```
+
+After one more time step, the board will look like this:
+
+```
+##############
+#         *  #
+#     s      #
+#     v   #  #
+#     v   #  #
+#     >>>x#  #
+#   s     #  #
+#A<<<  *  #  #
+#            #
+##############
+```
+
+Snakes are guaranteed to be at least three units long.
+
+### Numbering snakes
+
+Each snake on the board is numbered depending on the position of its tail, in the order that the tails appear in the file (going from top-to-bottom, then left-to-right). For example, consider the following board with four snakes:
+
+```
+#############
+#  s  d>>D  #
+#  v   A<a  #
+#  S    W   #
+#       ^   #
+#       w   #
+#############
+```
+
+Snake 0 is the snake with tail `s`, snake 1 has tail `d`, snake 2 has tail `a`, and snake 3 has tail `w`.
+
+Once the snakes are numbered from their initial positions, the numbering of the snakes does not change throughout the game.
+
+### Game board
+
+A game board is a grid of characters, not necessarily rectangular. Here's an example of a non-rectangular board:
+
+```
+##############
+#            #######
+#####             ##
+#   #             ##
+#####             ######
+#                 ##   #
+#                 ######
+#                 ##
+#                  #
+#      #####       #
+########   #########
+```
+
+Note that each row can have a different number of characters, but will start and end with a wall (`#`). You can also assume that the board is an enclosed space, so snakes can't travel infinitely far in any direction.
+
+### The `game_state_t` struct
+
+A snake game is stored in memory in a `game_state_t` struct, which is defined in `state.h`. The struct contains the following fields:
+
+*   `unsigned int num_rows`: The number of rows in the game board.
+*   `char** board`: The game board in memory. Each element of the `board` array is a `char*` pointer to a character array containing a row of the board. Each row must be terminated by a new line character and must be a valid string.
+*   `unsigned int num_snakes`: The number of snakes on the board.
+*   `snake_t* snakes`: An array of `snake_t` structs.
+
+### The `snake_t` struct
+
+Also defined in `state.h`, each `snake_t` struct contains the following fields:
+
+*   `unsigned int tail_row`: The row of the snake's tail.
+*   `unsigned int tail_col`: The column of the snake's tail.
+*   `unsigned int head_row`: The row of the snake's head.
+*   `unsigned int head_col`: The column of the snake's head.
+*   `bool live`: `true` if the snake is alive, and `false` if the snake is dead.
+
+Please don't modify the provided struct definitions. You should only need to modify `state.c` `snake.c`, and `custom_tests.c` in this project.
+
+## Task 1: `create_default_state`
+
+Implement the `create_default_state` function in `state.c`. This function should create a default snake game in memory with the following starting state (which you can hardcode), and return a pointer to the newly created `game_state_t` struct.
+
+```
+####################
+#                  #
+# d>D    *         #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+####################
+```
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>create_default_state</code></td></tr><tr><td><b>Arguments</b></td><td colspan='2'>None</td></tr><tr><td><b>Return values</b></td><td><code>game_state_t *</code></td><td>A pointer to the newly created <code>game_state_t</code> struct.</td></tr></tbody></table>
+
+### Hints
+
+*   The board has 18 rows, and each row has 20 columns. The fruit is at row 2, column 9 (zero-indexed). The tail is at row 2, column 2, and the head is at row 2, column 4.
+*   Which part of memory (code, static, stack, heap) should you store the new game in?
+*   `strcpy` may be helpful.
+
+
+
+## Solution
+
+```c
+/* Task 1 */
+game_state_t *create_default_state() {
+  unsigned int num_cols = 20;
+  game_state_t *state = (game_state_t *)malloc(sizeof(game_state_t));
+  state->num_rows = 18;
+  state->num_snakes = 1;
+
+  // init board
+  state->board = (char **)calloc(state->num_rows, sizeof(char *));
+  for (size_t i = 0; i < state->num_rows; i++) {
+    state->board[i] = (char *)calloc(num_cols + 1, sizeof(char));
+  }
+  // begin an end row
+  strcpy(state->board[0], '####################');
+  strcpy(state->board[state->num_rows - 1], '####################');
+  // main body
+  for (unsigned int i = 1; i < state->num_rows - 1; i++) {
+    strcpy(state->board[i], '#                  #');
+  }
+
+  // init snake
+  state->snakes = (snake_t *)malloc(sizeof(snake_t) * state->num_snakes);
+  state->snakes[0].tail_row = 2;
+  state->snakes[0].tail_col = 2;
+  state->snakes[0].head_row = 2;
+  state->snakes[0].head_col = 4;
+  state->snakes[0].live = true;
+
+  // init fruit  
+  state->board[2][9] = '*';
+
+  // render board
+  snake_t snake = state->snakes[0];
+  state->board[2][2] = 'd';
+  state->board[snake.tail_row][snake.tail_col] = 'd';
+  state->board[snake.head_row][snake.head_col] = 'D';
+  state->board[snake.head_row][snake.head_col - 1] = '>';
+  return state;
+}
+
+```
+
+
+
+
+
+## Task 2: `free_state`
+
+Implement the `free_state` function in `state.c`. This function should free all memory allocated for the given state, including all `snake` structs and all `state`->`board` contents.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>free_state</code></td></tr><tr><td><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be freed</td></tr><tr><td><b>Return values</b></td><td colspan='2'>None</td></tr></tbody></table>
+
+## Solution
+
+```c
+/* Task 2 */
+void free_state(game_state_t *state)
+{
+  for (size_t i = 0; i < state->num_rows; i++) {
+    free(state->board[i]);
+  }
+  free(state->snakes);
+  free(state->board);
+  free(state);
+  return;
+}
+```
+
+
+
+
+
+
+
+## Task 3: `print_board`
+
+Implement the `print_board` function in `state.c`. This function should print out the given game board to the given file pointer.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>print_board</code></td></tr><tr><td rowspan='2'><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be printed</td></tr><tr><td><code>FILE* fp</code></td><td>A pointer to the file object where the board should be printed to</td></tr><tr><td><b>Return values</b></td><td colspan='2'>None</td></tr></tbody></table>
+
+### Hints
+
+*   The `fprintf` function will help you print out characters and/or strings to a given file pointer.
+
+## Solution
+
+```c
+void print_board(game_state_t *state, FILE *fp)
+{
+  for (size_t i = 0; i < state->num_rows; i++) {
+    fprintf(fp, '%s\n', state->board[i]);
+  }
+  return;
+}
+```
+
+
+
+## Task 4: `update_state`
+
+Implement the `update_state` function in `state.c`. This function should move the snakes one timestep according to the rules of the game.
+
+Helper functions are not graded; for this task, we'll only be checking that `update_state` is correct.
+
+### Task 4.1: Helpers
+
+We have provided the following helper function definitions that you can implement. These functions are entirely independent of any game board or snake; they only take in a single character and output some information about that character.
+
+*   `bool is_tail(char c)`: Returns true if `c` is part of the snake's tail. The snake's tail consists of these characters: `wasd`. Returns false otherwise.
+*   `bool is_head(char c)`: Returns true if `c` is part of the snake's head. The snake's head consists of these characters: `WASDx`. Returns false otherwise.
+*   `bool is_snake(char c)`: Returns true if `c` is part of the snake. The snake consists of these characters: `wasd^<v>WASDx`. Returns false otherwise.
+*   `char body_to_tail(char c)`: Converts a character in the snake's body (`^<v>`) to the matching character representing the snake's tail (`wasd`). The output may be undefined for characters that are not a snake's body.
+*   `char head_to_body(char c)`: Converts a character in the snake's head (`WASD`) to the matching character representing the snake's body (`^<v>`). The output may be undefined for characters that are not a snake's head.
+*   `unsigned int get_next_row(unsigned int cur_row, char c)`: Returns `cur_row + 1` if `c` is `v` or `s` or `S`. Returns `cur_row - 1` if `c` is `^` or `w` or `W`. Returns `cur_row` otherwise.
+*   `unsigned int get_next_col(unsigned int cur_col, char c)`: Returns `cur_col + 1` if `c` is `>` or `d` or `D`. Returns `cur_col - 1` if `c` is `<` or `a` or `A`. Returns `cur_col` otherwise.
+
+Unit tests are not provided for these helper functions, so you'll have to write your own tests in `custom_tests.c` to make sure that these are working as expected. Make sure that these tests comprehensively test your helper functions--our autograder will run your tests on buggy implementations to make sure that your tests can catch bugs!
+
+When writing a unit test, the test function should return `false` if the test fails, and `true` if the test passes. You can use `printf` to print out debugging statements. Some of the assert helper functions in `asserts.h` might be useful.
+
+Once you've written your own unit tests, you can run them with `make run-custom-tests` and `make debug-custom-tests`.
+
+## Solution
+
+```c
+static bool is_tail(char c) {
+  return c == 'w' || c == 'a' || c == 's' || c == 'd';
+}
+static bool is_head(char c) {
+  return c == 'W' || c == 'A' || c == 'S' || c == 'D' || c == 'x';
+}
+static bool is_snake(char c) {
+  return is_tail(c) || is_head(c) || c == 'v' || c == '^' || c == '<' || c == '>';
+}
+static char body_to_tail(char ch) {
+  switch (ch) {
+      case '^':
+          ch = 'w';
+          break;
+      case 'v':
+          ch = 's';
+          break;
+      case '>':
+          ch = 'd';
+          break;
+      case '<':
+          ch = 'a';
+          break;
+      default:
+          ch = '?';
+          break;
+  }
+  return ch;
+}
+static char head_to_body(char c) {
+  char cb;
+  switch (c) {
+      case 'W':
+        cb = '^';
+        break;
+      case 'S':
+        cb = 'v';
+        break;
+      case 'A':
+        cb = '<';
+        break;
+      case 'D':
+        cb = '>';
+        break;
+      default:
+        cb = '?';
+  }
+  return cb;
+}
+
+static unsigned int get_next_row(unsigned int cur_row, char c) {
+  if (c == 'v' || c == 's' || c == 'S') {
+    cur_row += 1;
+  }
+  else if (c == '^' || c == 'w' || c == 'W') {
+    cur_row -= 1;
+  }
+  return cur_row;
+}
+
+static unsigned int get_next_col(unsigned int cur_col, char c) {
+  if (c == '>' || c == 'd' || c == 'D') {
+    cur_col += 1;
+  }
+  else if (c == '<' || c == 'a' || c == 'A') {
+    cur_col -= 1;
+  }
+  return cur_col;
+}
+```
+
+
+
+### Task 4.2: `next_square`
+
+Implement the `next_square` helper function in `state.c`. This function returns the character in the cell the given snake is moving into. This function should not modify anything in the game stored in memory.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>next_square</code></td></tr><tr><td rowspan='2'><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be analyzed</td></tr><tr><td><code>int snum</code></td><td>The index of the snake to be analyzed</td></tr><tr><td><b>Return values</b></td><td><code>char</code></td><td>The character in the cell the given snake is moving into</td></tr></tbody></table>
+
+As an example, consider the following board:
+
+```
+##############
+#            #
+#            #
+#            #
+#   d>D*     #
+#            #
+#       s    #
+#       v    #
+#       S    #
+##############
+```
+
+Assuming that `state` is a pointer to this game state, then `next_square(state, 0)` should return `*`, because the head of snake 0 is moving into a cell with `*` in it. Similarly, `next_square(state, 1)` should return `#` for snake 1.
+
+The helper functions you wrote earlier might be helpful for this function (and the rest of this task too). Also, check out `get_board_at` and `set_board_at`, which are helper functions we wrote for you.
+
+Use `make run-unit-tests` and `make debug-unit-tests` to run the provided unit tests. You can also use `p print_board(state, stdout)` to print out your entire board while debugging in `cgdb`.
+
+
+
+## Solution
+
+```c
+static char next_square(game_state_t *state, unsigned int snum) {
+  snake_t snake = state->snakes[snum];
+  char head_char = state->board[snake.head_row][snake.head_col];
+  unsigned int next_col = get_next_col(snake.head_col, head_char);
+  unsigned int next_row = get_next_row(snake.head_row, head_char);
+  return get_board_at(state, next_row, next_col);
+}
+```
+
+
+
+### Task 4.3: `update_head`
+
+Implement the `update_head` function in `state.c`. This function will update the head of the snake.
+
+Remember that you will need to update the head both on the game board and in the `snake_t` struct. On the game board, add a character where the snake is moving. In the `snake_t` struct, update the row and column of the head.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>update_head</code></td></tr><tr><td rowspan='2'><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be updated</td></tr><tr><td><code>int snum</code></td><td>The index of the snake to be updated</td></tr><tr><td><b>Return values</b></td><td colspan='2'>None</td></tr></tbody></table>
+
+As an example, consider the following board:
+
+```
+##############
+#   d>D      #
+#        *   #
+#        W   #
+#        ^   #
+#        ^   #
+#        w   #
+#            #
+#            #
+##############
+
+
+```
+
+Assuming that `state` is a pointer to this game state, then `update_head(state, 0)` will move the head of snake 0, leaving all other snakes unchanged. In the `snake_t` struct corresponding to snake 0, the `head_col` value should be updated from 6 to 7, and the `head_row` value should stay unchanged at 1. The new board will look like this:
+
+```
+##############
+#   d>>D     #
+#        *   #
+#        W   #
+#        ^   #
+#        ^   #
+#        w   #
+#            #
+#            #
+##############
+
+
+```
+
+Note that this function ignores food, walls, and snake bodies when moving the head.
+
+## Solution
+
+```c
+static void update_head(game_state_t *state, unsigned int snum) {
+  snake_t *snake = (state->snakes) + snum;
+  unsigned int cur_row = snake->head_row;
+  unsigned int cur_col = snake->head_col;
+  char cur_char = state->board[cur_row][cur_col];
+  unsigned int next_row = get_next_row(cur_row, cur_char);
+  unsigned int next_col = get_next_col(cur_col, cur_char);
+  set_board_at(state, next_row, next_col, cur_char);
+  set_board_at(state, cur_row, cur_col, head_to_body(cur_char));
+  snake->head_row = next_row;
+  snake->head_col = next_col;
+  return;
+}
+```
+
+
+
+### Task 4.4: `update_tail`
+
+Implement the `update_tail` function in `state.c`. This function will update the tail of the snake.
+
+Remember that you will need to update the tail both on the game board and in the `snake_t` struct. On the game board, blank out the current tail, and change the new tail from a body character (`^<v>`) into a tail character (`wasd`). In the `snake_t` struct, update the row and column of the tail.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>update_tail</code></td></tr><tr><td rowspan='2'><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be updated</td></tr><tr><td><code>int snum</code></td><td>The index of the snake to be updated</td></tr><tr><td><b>Return values</b></td><td colspan='2'>None</td></tr></tbody></table>
+
+As an example, consider the following board:
+
+```
+##############
+#   d>D      #
+#        *   #
+#        W   #
+#        ^   #
+#        ^   #
+#        w   #
+#            #
+#            #
+##############
+```
+
+Assuming that `state` is a pointer to this game state, then `update_tail(state, 1)` will move the tail of snake 1, leaving all other snakes unchanged. In the `snake_t` struct corresponding to snake 1, the `tail_row` value should be updated from 6 to 5, and the `tail_col` value should stay unchanged at 9. The new board will look like this:
+
+```
+##############
+#   d>D      #
+#        *   #
+#        W   #
+#        ^   #
+#        w   #
+#            #
+#            #
+#            #
+##############
+```
+
+## Solution
+
+```c
+static void update_tail(game_state_t *state, unsigned int snum) {
+  snake_t *snake_ptr = &state->snakes[snum];
+  char tail_char = state->board[snake_ptr->tail_row][snake_ptr->tail_col];
+  unsigned int next_row = get_next_row(snake_ptr->tail_row, tail_char);
+  unsigned int next_col = get_next_col(snake_ptr->tail_col, tail_char);
+  set_board_at(state, snake_ptr->tail_row, snake_ptr->tail_col, ' ');
+  set_board_at(state, next_row, next_col, body_to_tail(state->board[next_row][next_col]));
+  snake_ptr->tail_row = next_row;
+  snake_ptr->tail_col = next_col;
+  return;
+}
+```
+
+
+
+### Task 4.5: `update_state`
+
+Using the helpers you created, implement `update_state` in `state.c`.
+
+As a reminder, the rules for moving a snake are as follows:
+
+*   Each snake moves one step in the direction of its head.
+*   If the head crashes into the body of a snake or a wall, the snake dies and stops moving. When a snake dies, the head is replaced with an `x`.
+*   If the head moves into a fruit, the snake eats the fruit and grows by 1 unit in length. (You can implement growing by 1 unit by updating the head without updating the tail.) Each time fruit is consumed, a new fruit is generated on the board.
+
+The `int (*add_food)(game_state_t* state)` argument is a function pointer, which means that `add_food` is a pointer to the code section of memory. The code that `add_food` is pointing at is a function that takes in `game_state_t* state` as an argument and returns an `int`. You can call this function with `add_food(x)`, replacing `x` with your argument, to add a fruit to the board.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>update_state</code></td></tr><tr><td rowspan='2'><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be updated</td></tr><tr><td><code>int (*add_food)(game_state_t* state)</code></td><td>A pointer to a function that will add fruit to the board</td></tr><tr><td><b>Return values</b></td><td colspan='2'>None</td></tr></tbody></table>
+
+## Solution
+
+```c
+void update_state(game_state_t *state, int (*add_food)(game_state_t *state))
+{
+  for (unsigned int i = 0; i < state->num_snakes; i++)
+  {
+    snake_t *snake_ptr = state->snakes + i;
+    char head_char = get_board_at(state, snake_ptr->head_row, snake_ptr->head_col);
+    unsigned int next_row = get_next_row(snake_ptr->head_row, head_char);
+    unsigned int next_col = get_next_col(snake_ptr->head_col, head_char);
+    char next_char = get_board_at(state, next_row, next_col);
+    if (is_snake(next_char) || next_char == '#') {
+      snake_ptr->live = false;
+      set_board_at(state, snake_ptr->head_row, snake_ptr->head_col, 'x');
+    } else if (next_char == '*') {
+      update_head(state, i);
+      add_food(state);
+    } else {
+      update_head(state, i);
+      update_tail(state, i);
+    }
+  }
+  return;
+}
+```
+
+
+
+
+
+## Task 5: `load_board`
+
+Implement the `load_board` function in `state.c`. This function will read a game board from a stream (`FILE *`) into memory. Your implementation of `load_board` must support reading in from `stdin` and any other streams, so please do not use anything that does not support `stdin`, such as seeking, rewinding, or reopening.
+
+Remember that each row of the game board might have a different number of columns. Your implementation should be memory-efficient and should not allocate significantly more memory than necessary to store the board. For example, if a row is 3 characters long, you shouldn't be allocating 100 bytes of space for that row.
+
+You must use `fgets` to read from the file pointer. We reserve the ability to manually regrade your submission if it uses a function other than `fgets` to read from `file`. Other string functions, such as `strchr`, may be helpful here as well!
+
+Hint: `realloc` may be helpful for this task.
+
+Tasks 5 and 6 combined will create a `game_state_t` struct in memory with all its fields set up. In this task, please set `num_snakes` to 0 and set the `snakes` array to `NULL`, since these will be initialized in task 6.
+
+### Task 5.1: `read_line`
+
+Implement the `read_line` function in `state.c`. Given a `FILE *` `file`, read a line from `file` and store the string on the heap. If `fgets` errors, return `NULL`.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>read_line</code></td></tr><tr><td><b>Arguments</b></td><td><code>FILE* file</code></td><td>A file pointer where the string can be read from</td></tr><tr><td><b>Return values</b></td><td><code>char *</code></td><td>A pointer to the newly read string. <code>NULL</code> if there are any errors, or if <code>EOF</code> is reached.</td></tr></tbody></table>
+
+## Solution
+
+```c
+char *read_line(FILE *fp) {
+  char *str = (char *) malloc(sizeof(char) * 255);
+  if (fgets(str, 255, fp) == NULL) {
+    return NULL;
+  }
+  while (str[strlen(str) - 1] != '\n') {
+    str = realloc(str, sizeof(char) * strlen(str) * 2);
+    fgets(str + strlen(str), 255, fp);
+  }
+  str = realloc(str, sizeof(char) * (strlen(str) + 1));
+  return str;
+}
+```
+
+
+
+### Task 5.2: `load_board`
+
+Using `read_line`, implement the `load_board` function in `state.c`.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>load_board</code></td></tr><tr><td><b>Arguments</b></td><td><code>FILE* file</code></td><td>A file pointer where the board can be read from</td></tr><tr><td><b>Return values</b></td><td><code>game_state_t *</code></td><td>A pointer to the newly created <code>game_state_t</code> struct. <code>NULL</code> if there are any errors.</td></tr></tbody></table>
+
+## Solution
+
+```c
+game_state_t *load_board(FILE *fp) {
+  unsigned int capacity = 255;
+  game_state_t* state = (game_state_t *) malloc(sizeof(game_state_t));
+  state->num_snakes = 0;
+  state->snakes = NULL;
+  state->num_rows = 0;
+  state->board = (char **)calloc(capacity, sizeof(char *));
+  char* str;
+  while ((str = read_line(fp)) != NULL) {
+    if (str[strlen(str) - 1] == '\n') {
+      str[strlen(str) - 1] = '\0';
+    }
+    state->board[(state->num_rows)++] = str;
+    if (state->num_rows >= capacity) {
+      capacity *= 2;
+      state->board = (char **) realloc(state->board, sizeof(char *) * capacity);
+    }
+  }
+  state->board = (char **) realloc(state->board, sizeof(char *) * state->num_rows);
+  return state;
+}
+```
+
+
+
+## Task 6: `initialize_snake`
+
+Implement the `initialize_snake` function in `state.c`. This function takes in a game board and creates the array of `snake_t` structs.
+
+### Task 6.1: `find_head`
+
+Implement the `find_head` function in `state.c`. Given a `snake_t` struct with the tail row and column filled in, this function traces through the board to find the head row and column, and fills in the head row and column in the struct.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>find_head</code></td></tr><tr><td rowspan='2'><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be analyzed</td></tr><tr><td><code>int snum</code></td><td>The index of the snake to be analyzed</td></tr><tr><td><b>Return values</b></td><td colspan='2'>None</td></tr></tbody></table>
+
+As an example, consider the following board:
+
+```
+##############
+#            #
+#        *   #
+#            #
+#   d>v      #
+#     v      #
+#  W  v      #
+#  ^<<<      #
+#            #
+##############
+
+
+```
+
+Assuming that `state` is a pointer to this game state, then `find_head(state, 0)` will fill in the `head_row` and `head_col` fields of the snake 0 struct with 6 and 3, respectively.
+
+## Solution
+
+```c
+static void find_head(game_state_t *state, unsigned int snum) {
+  snake_t * snake_ptr = (state->snakes) + snum;
+  unsigned int row = snake_ptr->tail_row;
+  unsigned int col = snake_ptr->tail_col;
+  char ch = state->board[row][col];
+  while (is_snake(ch) && !is_head(ch)) {
+    row = get_next_row(row, ch);
+    col = get_next_col(col, ch);
+    ch = state->board[row][col];
+  }
+  snake_ptr->head_row = row;
+  snake_ptr->head_col = col;
+  return;
+}
+```
+
+
+
+### Task 6.2: `initialize_snake`
+
+Using `find_head`, implement the `initialize_snake` function in `state.c`. You can assume that the state passed into this function is the result of calling `load_board`, but you may not assume that the `snakes` array is defined. This means the board-related fields are already filled in, and you only need to fill in `num_snakes` and create the `snakes` array.
+
+You may assume that all snakes on the board start out alive.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>initialize_snakes</code></td></tr><tr><td><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be filled in</td></tr><tr><td><b>Return values</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct with fields filled in. This can be the same as the struct passed in (you can modify the struct in-place).</td></tr></tbody></table>
+
+## Solution
+
+```c
+game_state_t *initialize_snakes(game_state_t *state) {
+  state->snakes = (snake_t *)malloc(sizeof(snake_t) * 512);
+  state->num_snakes = 0;
+  for (unsigned int i = 0; i < state->num_rows; i++)
+  {
+    char* row = state->board[i];
+
+    for (unsigned int j = 0; j < strlen(row); j++)
+    {
+      
+      char ch = row[j];
+      if (is_tail(ch)) {
+        snake_t* snake = state->snakes + (state->num_snakes);
+        snake->live = true;
+        snake->tail_row = i;
+        snake->tail_col = j;
+        state->num_snakes += 1;
+      }
+    }
+  }
+  for (unsigned int i = 0; i < state->num_snakes; i++) {
+    find_head(state, i);
+  }
+  print_board(state, stdout);
+  return state;
+}
+```
+
+
+
+## Task 7: `main`
+
+Using the functions you implemented in all the previous tasks, fill in the blanks in `snake.c`. Each time the `snake.c` program is run, the board will be updated by one time step.
+
+## Solution
+
+```c
+int main(int argc, char *argv[]) {
+  bool io_stdin = false;
+  char *in_filename = NULL;
+  char *out_filename = NULL;
+  game_state_t *state = NULL;
+
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], '-i') == 0 && i < argc - 1) {
+      if (io_stdin) {
+        fprintf(stderr, 'Usage: %s [-i filename | --stdin] [-o filename]\n', argv[0]);
+        return 1;
+      }
+      in_filename = argv[i + 1];
+      i++;
+      continue;
+    } else if (strcmp(argv[i], '--stdin') == 0) {
+      if (in_filename != NULL) {
+        fprintf(stderr, 'Usage: %s [-i filename | --stdin] [-o filename]\n', argv[0]);
+        return 1;
+      }
+      io_stdin = true;
+      continue;
+    }
+    if (strcmp(argv[i], '-o') == 0 && i < argc - 1) {
+      out_filename = argv[i + 1];
+      i++;
+      continue;
+    }
+    fprintf(stderr, 'Usage: %s [-i filename | --stdin] [-o filename]\n', argv[0]);
+    return 1;
+  }
+
+  if (in_filename != NULL) {
+    FILE * fp = fopen(in_filename, 'r');
+    if (fp == NULL) {
+      return -1;
+    }
+    state = load_board(fp);
+    initialize_snakes(state);
+  } else if (io_stdin) {
+    state = load_board(stdin);
+    initialize_snakes(state);
+  } else {
+    create_default_state();
+  }
+  update_state(state, deterministic_food);
+  if (out_filename != NULL) {
+    FILE *fp = fopen(out_filename, 'w+');
+    print_board(state, fp);
+  } else {
+    print_board(state, stdout);
+  }
+  free_state(state);
+  return 0;
+}
+```
+
+。">
+<meta property="og:title" content="cs61c-sp24-project1: snek">
+<meta property="og:description" content="# Snake
+
+> creating a playable snake game
+
+## Conceptual Overview
+
+### Snakes
+
+A snake game can be represented by a grid of characters. 
+
+The grid contains walls, fruits, and one or more snakes. 
+
+An example of a game is shown below:
+
+```javascript
+##############
+#            #
+#    dv      #
+#     v   #  #
+#     v   #  #
+#   s >>D #  #
+#   v     #  #
+# *A<  *  #  #
+#            #
+##############
+```
+
+The grid has the following special characters:
+
+*   `#` denotes a wall.
+*   (space character) denotes an empty space.
+*   `*` denotes a fruit.
+*   `wasd` denotes the tail of a snake.
+*   `^<v>` denotes the body of a snake.
+*   `WASD` denotes the head of a snake.
+*   `x` denotes the head of a snake that has died.
+
+Each character of the snake tells you what direction the snake is currently heading in:
+
+*   `w`, `W`, or `^` denotes up
+*   `a`, `A`, or `<` denotes left
+*   `s`, `S`, or `v` denotes down
+*   `d`, `D`, or `>` denotes right
+
+At each time step, each snakes moves according to the following rules:
+
+*   Each snake moves one step in the direction of its head.
+*   If the head crashes into the body of a snake or a wall, the snake dies and stops moving. When a snake dies, the head is replaced with an `x`.
+*   If the head moves into a fruit, the snake eats the fruit and grows by 1 unit in length. Each time fruit is consumed, a new fruit is generated on the board.
+
+In the example above, after one time step, the board will look like this:
+
+```
+##############
+#         *  #
+#     s      #
+#     v   #  #
+#     v   #  #
+#   s >>>D#  #
+#   v     #  #
+# A<<  *  #  #
+#            #
+##############
+```
+
+After one more time step, the board will look like this:
+
+```
+##############
+#         *  #
+#     s      #
+#     v   #  #
+#     v   #  #
+#     >>>x#  #
+#   s     #  #
+#A<<<  *  #  #
+#            #
+##############
+```
+
+Snakes are guaranteed to be at least three units long.
+
+### Numbering snakes
+
+Each snake on the board is numbered depending on the position of its tail, in the order that the tails appear in the file (going from top-to-bottom, then left-to-right). For example, consider the following board with four snakes:
+
+```
+#############
+#  s  d>>D  #
+#  v   A<a  #
+#  S    W   #
+#       ^   #
+#       w   #
+#############
+```
+
+Snake 0 is the snake with tail `s`, snake 1 has tail `d`, snake 2 has tail `a`, and snake 3 has tail `w`.
+
+Once the snakes are numbered from their initial positions, the numbering of the snakes does not change throughout the game.
+
+### Game board
+
+A game board is a grid of characters, not necessarily rectangular. Here's an example of a non-rectangular board:
+
+```
+##############
+#            #######
+#####             ##
+#   #             ##
+#####             ######
+#                 ##   #
+#                 ######
+#                 ##
+#                  #
+#      #####       #
+########   #########
+```
+
+Note that each row can have a different number of characters, but will start and end with a wall (`#`). You can also assume that the board is an enclosed space, so snakes can't travel infinitely far in any direction.
+
+### The `game_state_t` struct
+
+A snake game is stored in memory in a `game_state_t` struct, which is defined in `state.h`. The struct contains the following fields:
+
+*   `unsigned int num_rows`: The number of rows in the game board.
+*   `char** board`: The game board in memory. Each element of the `board` array is a `char*` pointer to a character array containing a row of the board. Each row must be terminated by a new line character and must be a valid string.
+*   `unsigned int num_snakes`: The number of snakes on the board.
+*   `snake_t* snakes`: An array of `snake_t` structs.
+
+### The `snake_t` struct
+
+Also defined in `state.h`, each `snake_t` struct contains the following fields:
+
+*   `unsigned int tail_row`: The row of the snake's tail.
+*   `unsigned int tail_col`: The column of the snake's tail.
+*   `unsigned int head_row`: The row of the snake's head.
+*   `unsigned int head_col`: The column of the snake's head.
+*   `bool live`: `true` if the snake is alive, and `false` if the snake is dead.
+
+Please don't modify the provided struct definitions. You should only need to modify `state.c` `snake.c`, and `custom_tests.c` in this project.
+
+## Task 1: `create_default_state`
+
+Implement the `create_default_state` function in `state.c`. This function should create a default snake game in memory with the following starting state (which you can hardcode), and return a pointer to the newly created `game_state_t` struct.
+
+```
+####################
+#                  #
+# d>D    *         #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+####################
+```
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>create_default_state</code></td></tr><tr><td><b>Arguments</b></td><td colspan='2'>None</td></tr><tr><td><b>Return values</b></td><td><code>game_state_t *</code></td><td>A pointer to the newly created <code>game_state_t</code> struct.</td></tr></tbody></table>
+
+### Hints
+
+*   The board has 18 rows, and each row has 20 columns. The fruit is at row 2, column 9 (zero-indexed). The tail is at row 2, column 2, and the head is at row 2, column 4.
+*   Which part of memory (code, static, stack, heap) should you store the new game in?
+*   `strcpy` may be helpful.
+
+
+
+## Solution
+
+```c
+/* Task 1 */
+game_state_t *create_default_state() {
+  unsigned int num_cols = 20;
+  game_state_t *state = (game_state_t *)malloc(sizeof(game_state_t));
+  state->num_rows = 18;
+  state->num_snakes = 1;
+
+  // init board
+  state->board = (char **)calloc(state->num_rows, sizeof(char *));
+  for (size_t i = 0; i < state->num_rows; i++) {
+    state->board[i] = (char *)calloc(num_cols + 1, sizeof(char));
+  }
+  // begin an end row
+  strcpy(state->board[0], '####################');
+  strcpy(state->board[state->num_rows - 1], '####################');
+  // main body
+  for (unsigned int i = 1; i < state->num_rows - 1; i++) {
+    strcpy(state->board[i], '#                  #');
+  }
+
+  // init snake
+  state->snakes = (snake_t *)malloc(sizeof(snake_t) * state->num_snakes);
+  state->snakes[0].tail_row = 2;
+  state->snakes[0].tail_col = 2;
+  state->snakes[0].head_row = 2;
+  state->snakes[0].head_col = 4;
+  state->snakes[0].live = true;
+
+  // init fruit  
+  state->board[2][9] = '*';
+
+  // render board
+  snake_t snake = state->snakes[0];
+  state->board[2][2] = 'd';
+  state->board[snake.tail_row][snake.tail_col] = 'd';
+  state->board[snake.head_row][snake.head_col] = 'D';
+  state->board[snake.head_row][snake.head_col - 1] = '>';
+  return state;
+}
+
+```
+
+
+
+
+
+## Task 2: `free_state`
+
+Implement the `free_state` function in `state.c`. This function should free all memory allocated for the given state, including all `snake` structs and all `state`->`board` contents.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>free_state</code></td></tr><tr><td><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be freed</td></tr><tr><td><b>Return values</b></td><td colspan='2'>None</td></tr></tbody></table>
+
+## Solution
+
+```c
+/* Task 2 */
+void free_state(game_state_t *state)
+{
+  for (size_t i = 0; i < state->num_rows; i++) {
+    free(state->board[i]);
+  }
+  free(state->snakes);
+  free(state->board);
+  free(state);
+  return;
+}
+```
+
+
+
+
+
+
+
+## Task 3: `print_board`
+
+Implement the `print_board` function in `state.c`. This function should print out the given game board to the given file pointer.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>print_board</code></td></tr><tr><td rowspan='2'><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be printed</td></tr><tr><td><code>FILE* fp</code></td><td>A pointer to the file object where the board should be printed to</td></tr><tr><td><b>Return values</b></td><td colspan='2'>None</td></tr></tbody></table>
+
+### Hints
+
+*   The `fprintf` function will help you print out characters and/or strings to a given file pointer.
+
+## Solution
+
+```c
+void print_board(game_state_t *state, FILE *fp)
+{
+  for (size_t i = 0; i < state->num_rows; i++) {
+    fprintf(fp, '%s\n', state->board[i]);
+  }
+  return;
+}
+```
+
+
+
+## Task 4: `update_state`
+
+Implement the `update_state` function in `state.c`. This function should move the snakes one timestep according to the rules of the game.
+
+Helper functions are not graded; for this task, we'll only be checking that `update_state` is correct.
+
+### Task 4.1: Helpers
+
+We have provided the following helper function definitions that you can implement. These functions are entirely independent of any game board or snake; they only take in a single character and output some information about that character.
+
+*   `bool is_tail(char c)`: Returns true if `c` is part of the snake's tail. The snake's tail consists of these characters: `wasd`. Returns false otherwise.
+*   `bool is_head(char c)`: Returns true if `c` is part of the snake's head. The snake's head consists of these characters: `WASDx`. Returns false otherwise.
+*   `bool is_snake(char c)`: Returns true if `c` is part of the snake. The snake consists of these characters: `wasd^<v>WASDx`. Returns false otherwise.
+*   `char body_to_tail(char c)`: Converts a character in the snake's body (`^<v>`) to the matching character representing the snake's tail (`wasd`). The output may be undefined for characters that are not a snake's body.
+*   `char head_to_body(char c)`: Converts a character in the snake's head (`WASD`) to the matching character representing the snake's body (`^<v>`). The output may be undefined for characters that are not a snake's head.
+*   `unsigned int get_next_row(unsigned int cur_row, char c)`: Returns `cur_row + 1` if `c` is `v` or `s` or `S`. Returns `cur_row - 1` if `c` is `^` or `w` or `W`. Returns `cur_row` otherwise.
+*   `unsigned int get_next_col(unsigned int cur_col, char c)`: Returns `cur_col + 1` if `c` is `>` or `d` or `D`. Returns `cur_col - 1` if `c` is `<` or `a` or `A`. Returns `cur_col` otherwise.
+
+Unit tests are not provided for these helper functions, so you'll have to write your own tests in `custom_tests.c` to make sure that these are working as expected. Make sure that these tests comprehensively test your helper functions--our autograder will run your tests on buggy implementations to make sure that your tests can catch bugs!
+
+When writing a unit test, the test function should return `false` if the test fails, and `true` if the test passes. You can use `printf` to print out debugging statements. Some of the assert helper functions in `asserts.h` might be useful.
+
+Once you've written your own unit tests, you can run them with `make run-custom-tests` and `make debug-custom-tests`.
+
+## Solution
+
+```c
+static bool is_tail(char c) {
+  return c == 'w' || c == 'a' || c == 's' || c == 'd';
+}
+static bool is_head(char c) {
+  return c == 'W' || c == 'A' || c == 'S' || c == 'D' || c == 'x';
+}
+static bool is_snake(char c) {
+  return is_tail(c) || is_head(c) || c == 'v' || c == '^' || c == '<' || c == '>';
+}
+static char body_to_tail(char ch) {
+  switch (ch) {
+      case '^':
+          ch = 'w';
+          break;
+      case 'v':
+          ch = 's';
+          break;
+      case '>':
+          ch = 'd';
+          break;
+      case '<':
+          ch = 'a';
+          break;
+      default:
+          ch = '?';
+          break;
+  }
+  return ch;
+}
+static char head_to_body(char c) {
+  char cb;
+  switch (c) {
+      case 'W':
+        cb = '^';
+        break;
+      case 'S':
+        cb = 'v';
+        break;
+      case 'A':
+        cb = '<';
+        break;
+      case 'D':
+        cb = '>';
+        break;
+      default:
+        cb = '?';
+  }
+  return cb;
+}
+
+static unsigned int get_next_row(unsigned int cur_row, char c) {
+  if (c == 'v' || c == 's' || c == 'S') {
+    cur_row += 1;
+  }
+  else if (c == '^' || c == 'w' || c == 'W') {
+    cur_row -= 1;
+  }
+  return cur_row;
+}
+
+static unsigned int get_next_col(unsigned int cur_col, char c) {
+  if (c == '>' || c == 'd' || c == 'D') {
+    cur_col += 1;
+  }
+  else if (c == '<' || c == 'a' || c == 'A') {
+    cur_col -= 1;
+  }
+  return cur_col;
+}
+```
+
+
+
+### Task 4.2: `next_square`
+
+Implement the `next_square` helper function in `state.c`. This function returns the character in the cell the given snake is moving into. This function should not modify anything in the game stored in memory.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>next_square</code></td></tr><tr><td rowspan='2'><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be analyzed</td></tr><tr><td><code>int snum</code></td><td>The index of the snake to be analyzed</td></tr><tr><td><b>Return values</b></td><td><code>char</code></td><td>The character in the cell the given snake is moving into</td></tr></tbody></table>
+
+As an example, consider the following board:
+
+```
+##############
+#            #
+#            #
+#            #
+#   d>D*     #
+#            #
+#       s    #
+#       v    #
+#       S    #
+##############
+```
+
+Assuming that `state` is a pointer to this game state, then `next_square(state, 0)` should return `*`, because the head of snake 0 is moving into a cell with `*` in it. Similarly, `next_square(state, 1)` should return `#` for snake 1.
+
+The helper functions you wrote earlier might be helpful for this function (and the rest of this task too). Also, check out `get_board_at` and `set_board_at`, which are helper functions we wrote for you.
+
+Use `make run-unit-tests` and `make debug-unit-tests` to run the provided unit tests. You can also use `p print_board(state, stdout)` to print out your entire board while debugging in `cgdb`.
+
+
+
+## Solution
+
+```c
+static char next_square(game_state_t *state, unsigned int snum) {
+  snake_t snake = state->snakes[snum];
+  char head_char = state->board[snake.head_row][snake.head_col];
+  unsigned int next_col = get_next_col(snake.head_col, head_char);
+  unsigned int next_row = get_next_row(snake.head_row, head_char);
+  return get_board_at(state, next_row, next_col);
+}
+```
+
+
+
+### Task 4.3: `update_head`
+
+Implement the `update_head` function in `state.c`. This function will update the head of the snake.
+
+Remember that you will need to update the head both on the game board and in the `snake_t` struct. On the game board, add a character where the snake is moving. In the `snake_t` struct, update the row and column of the head.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>update_head</code></td></tr><tr><td rowspan='2'><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be updated</td></tr><tr><td><code>int snum</code></td><td>The index of the snake to be updated</td></tr><tr><td><b>Return values</b></td><td colspan='2'>None</td></tr></tbody></table>
+
+As an example, consider the following board:
+
+```
+##############
+#   d>D      #
+#        *   #
+#        W   #
+#        ^   #
+#        ^   #
+#        w   #
+#            #
+#            #
+##############
+
+
+```
+
+Assuming that `state` is a pointer to this game state, then `update_head(state, 0)` will move the head of snake 0, leaving all other snakes unchanged. In the `snake_t` struct corresponding to snake 0, the `head_col` value should be updated from 6 to 7, and the `head_row` value should stay unchanged at 1. The new board will look like this:
+
+```
+##############
+#   d>>D     #
+#        *   #
+#        W   #
+#        ^   #
+#        ^   #
+#        w   #
+#            #
+#            #
+##############
+
+
+```
+
+Note that this function ignores food, walls, and snake bodies when moving the head.
+
+## Solution
+
+```c
+static void update_head(game_state_t *state, unsigned int snum) {
+  snake_t *snake = (state->snakes) + snum;
+  unsigned int cur_row = snake->head_row;
+  unsigned int cur_col = snake->head_col;
+  char cur_char = state->board[cur_row][cur_col];
+  unsigned int next_row = get_next_row(cur_row, cur_char);
+  unsigned int next_col = get_next_col(cur_col, cur_char);
+  set_board_at(state, next_row, next_col, cur_char);
+  set_board_at(state, cur_row, cur_col, head_to_body(cur_char));
+  snake->head_row = next_row;
+  snake->head_col = next_col;
+  return;
+}
+```
+
+
+
+### Task 4.4: `update_tail`
+
+Implement the `update_tail` function in `state.c`. This function will update the tail of the snake.
+
+Remember that you will need to update the tail both on the game board and in the `snake_t` struct. On the game board, blank out the current tail, and change the new tail from a body character (`^<v>`) into a tail character (`wasd`). In the `snake_t` struct, update the row and column of the tail.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>update_tail</code></td></tr><tr><td rowspan='2'><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be updated</td></tr><tr><td><code>int snum</code></td><td>The index of the snake to be updated</td></tr><tr><td><b>Return values</b></td><td colspan='2'>None</td></tr></tbody></table>
+
+As an example, consider the following board:
+
+```
+##############
+#   d>D      #
+#        *   #
+#        W   #
+#        ^   #
+#        ^   #
+#        w   #
+#            #
+#            #
+##############
+```
+
+Assuming that `state` is a pointer to this game state, then `update_tail(state, 1)` will move the tail of snake 1, leaving all other snakes unchanged. In the `snake_t` struct corresponding to snake 1, the `tail_row` value should be updated from 6 to 5, and the `tail_col` value should stay unchanged at 9. The new board will look like this:
+
+```
+##############
+#   d>D      #
+#        *   #
+#        W   #
+#        ^   #
+#        w   #
+#            #
+#            #
+#            #
+##############
+```
+
+## Solution
+
+```c
+static void update_tail(game_state_t *state, unsigned int snum) {
+  snake_t *snake_ptr = &state->snakes[snum];
+  char tail_char = state->board[snake_ptr->tail_row][snake_ptr->tail_col];
+  unsigned int next_row = get_next_row(snake_ptr->tail_row, tail_char);
+  unsigned int next_col = get_next_col(snake_ptr->tail_col, tail_char);
+  set_board_at(state, snake_ptr->tail_row, snake_ptr->tail_col, ' ');
+  set_board_at(state, next_row, next_col, body_to_tail(state->board[next_row][next_col]));
+  snake_ptr->tail_row = next_row;
+  snake_ptr->tail_col = next_col;
+  return;
+}
+```
+
+
+
+### Task 4.5: `update_state`
+
+Using the helpers you created, implement `update_state` in `state.c`.
+
+As a reminder, the rules for moving a snake are as follows:
+
+*   Each snake moves one step in the direction of its head.
+*   If the head crashes into the body of a snake or a wall, the snake dies and stops moving. When a snake dies, the head is replaced with an `x`.
+*   If the head moves into a fruit, the snake eats the fruit and grows by 1 unit in length. (You can implement growing by 1 unit by updating the head without updating the tail.) Each time fruit is consumed, a new fruit is generated on the board.
+
+The `int (*add_food)(game_state_t* state)` argument is a function pointer, which means that `add_food` is a pointer to the code section of memory. The code that `add_food` is pointing at is a function that takes in `game_state_t* state` as an argument and returns an `int`. You can call this function with `add_food(x)`, replacing `x` with your argument, to add a fruit to the board.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>update_state</code></td></tr><tr><td rowspan='2'><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be updated</td></tr><tr><td><code>int (*add_food)(game_state_t* state)</code></td><td>A pointer to a function that will add fruit to the board</td></tr><tr><td><b>Return values</b></td><td colspan='2'>None</td></tr></tbody></table>
+
+## Solution
+
+```c
+void update_state(game_state_t *state, int (*add_food)(game_state_t *state))
+{
+  for (unsigned int i = 0; i < state->num_snakes; i++)
+  {
+    snake_t *snake_ptr = state->snakes + i;
+    char head_char = get_board_at(state, snake_ptr->head_row, snake_ptr->head_col);
+    unsigned int next_row = get_next_row(snake_ptr->head_row, head_char);
+    unsigned int next_col = get_next_col(snake_ptr->head_col, head_char);
+    char next_char = get_board_at(state, next_row, next_col);
+    if (is_snake(next_char) || next_char == '#') {
+      snake_ptr->live = false;
+      set_board_at(state, snake_ptr->head_row, snake_ptr->head_col, 'x');
+    } else if (next_char == '*') {
+      update_head(state, i);
+      add_food(state);
+    } else {
+      update_head(state, i);
+      update_tail(state, i);
+    }
+  }
+  return;
+}
+```
+
+
+
+
+
+## Task 5: `load_board`
+
+Implement the `load_board` function in `state.c`. This function will read a game board from a stream (`FILE *`) into memory. Your implementation of `load_board` must support reading in from `stdin` and any other streams, so please do not use anything that does not support `stdin`, such as seeking, rewinding, or reopening.
+
+Remember that each row of the game board might have a different number of columns. Your implementation should be memory-efficient and should not allocate significantly more memory than necessary to store the board. For example, if a row is 3 characters long, you shouldn't be allocating 100 bytes of space for that row.
+
+You must use `fgets` to read from the file pointer. We reserve the ability to manually regrade your submission if it uses a function other than `fgets` to read from `file`. Other string functions, such as `strchr`, may be helpful here as well!
+
+Hint: `realloc` may be helpful for this task.
+
+Tasks 5 and 6 combined will create a `game_state_t` struct in memory with all its fields set up. In this task, please set `num_snakes` to 0 and set the `snakes` array to `NULL`, since these will be initialized in task 6.
+
+### Task 5.1: `read_line`
+
+Implement the `read_line` function in `state.c`. Given a `FILE *` `file`, read a line from `file` and store the string on the heap. If `fgets` errors, return `NULL`.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>read_line</code></td></tr><tr><td><b>Arguments</b></td><td><code>FILE* file</code></td><td>A file pointer where the string can be read from</td></tr><tr><td><b>Return values</b></td><td><code>char *</code></td><td>A pointer to the newly read string. <code>NULL</code> if there are any errors, or if <code>EOF</code> is reached.</td></tr></tbody></table>
+
+## Solution
+
+```c
+char *read_line(FILE *fp) {
+  char *str = (char *) malloc(sizeof(char) * 255);
+  if (fgets(str, 255, fp) == NULL) {
+    return NULL;
+  }
+  while (str[strlen(str) - 1] != '\n') {
+    str = realloc(str, sizeof(char) * strlen(str) * 2);
+    fgets(str + strlen(str), 255, fp);
+  }
+  str = realloc(str, sizeof(char) * (strlen(str) + 1));
+  return str;
+}
+```
+
+
+
+### Task 5.2: `load_board`
+
+Using `read_line`, implement the `load_board` function in `state.c`.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>load_board</code></td></tr><tr><td><b>Arguments</b></td><td><code>FILE* file</code></td><td>A file pointer where the board can be read from</td></tr><tr><td><b>Return values</b></td><td><code>game_state_t *</code></td><td>A pointer to the newly created <code>game_state_t</code> struct. <code>NULL</code> if there are any errors.</td></tr></tbody></table>
+
+## Solution
+
+```c
+game_state_t *load_board(FILE *fp) {
+  unsigned int capacity = 255;
+  game_state_t* state = (game_state_t *) malloc(sizeof(game_state_t));
+  state->num_snakes = 0;
+  state->snakes = NULL;
+  state->num_rows = 0;
+  state->board = (char **)calloc(capacity, sizeof(char *));
+  char* str;
+  while ((str = read_line(fp)) != NULL) {
+    if (str[strlen(str) - 1] == '\n') {
+      str[strlen(str) - 1] = '\0';
+    }
+    state->board[(state->num_rows)++] = str;
+    if (state->num_rows >= capacity) {
+      capacity *= 2;
+      state->board = (char **) realloc(state->board, sizeof(char *) * capacity);
+    }
+  }
+  state->board = (char **) realloc(state->board, sizeof(char *) * state->num_rows);
+  return state;
+}
+```
+
+
+
+## Task 6: `initialize_snake`
+
+Implement the `initialize_snake` function in `state.c`. This function takes in a game board and creates the array of `snake_t` structs.
+
+### Task 6.1: `find_head`
+
+Implement the `find_head` function in `state.c`. Given a `snake_t` struct with the tail row and column filled in, this function traces through the board to find the head row and column, and fills in the head row and column in the struct.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>find_head</code></td></tr><tr><td rowspan='2'><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be analyzed</td></tr><tr><td><code>int snum</code></td><td>The index of the snake to be analyzed</td></tr><tr><td><b>Return values</b></td><td colspan='2'>None</td></tr></tbody></table>
+
+As an example, consider the following board:
+
+```
+##############
+#            #
+#        *   #
+#            #
+#   d>v      #
+#     v      #
+#  W  v      #
+#  ^<<<      #
+#            #
+##############
+
+
+```
+
+Assuming that `state` is a pointer to this game state, then `find_head(state, 0)` will fill in the `head_row` and `head_col` fields of the snake 0 struct with 6 and 3, respectively.
+
+## Solution
+
+```c
+static void find_head(game_state_t *state, unsigned int snum) {
+  snake_t * snake_ptr = (state->snakes) + snum;
+  unsigned int row = snake_ptr->tail_row;
+  unsigned int col = snake_ptr->tail_col;
+  char ch = state->board[row][col];
+  while (is_snake(ch) && !is_head(ch)) {
+    row = get_next_row(row, ch);
+    col = get_next_col(col, ch);
+    ch = state->board[row][col];
+  }
+  snake_ptr->head_row = row;
+  snake_ptr->head_col = col;
+  return;
+}
+```
+
+
+
+### Task 6.2: `initialize_snake`
+
+Using `find_head`, implement the `initialize_snake` function in `state.c`. You can assume that the state passed into this function is the result of calling `load_board`, but you may not assume that the `snakes` array is defined. This means the board-related fields are already filled in, and you only need to fill in `num_snakes` and create the `snakes` array.
+
+You may assume that all snakes on the board start out alive.
+
+<table><colgroup><col span='1'> <col span='1'> <col span='1'> </colgroup><tbody><tr><td colspan='3'><code>initialize_snakes</code></td></tr><tr><td><b>Arguments</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct to be filled in</td></tr><tr><td><b>Return values</b></td><td><code>game_state_t* state</code></td><td>A pointer to the <code>game_state_t</code> struct with fields filled in. This can be the same as the struct passed in (you can modify the struct in-place).</td></tr></tbody></table>
+
+## Solution
+
+```c
+game_state_t *initialize_snakes(game_state_t *state) {
+  state->snakes = (snake_t *)malloc(sizeof(snake_t) * 512);
+  state->num_snakes = 0;
+  for (unsigned int i = 0; i < state->num_rows; i++)
+  {
+    char* row = state->board[i];
+
+    for (unsigned int j = 0; j < strlen(row); j++)
+    {
+      
+      char ch = row[j];
+      if (is_tail(ch)) {
+        snake_t* snake = state->snakes + (state->num_snakes);
+        snake->live = true;
+        snake->tail_row = i;
+        snake->tail_col = j;
+        state->num_snakes += 1;
+      }
+    }
+  }
+  for (unsigned int i = 0; i < state->num_snakes; i++) {
+    find_head(state, i);
+  }
+  print_board(state, stdout);
+  return state;
+}
+```
+
+
+
+## Task 7: `main`
+
+Using the functions you implemented in all the previous tasks, fill in the blanks in `snake.c`. Each time the `snake.c` program is run, the board will be updated by one time step.
+
+## Solution
+
+```c
+int main(int argc, char *argv[]) {
+  bool io_stdin = false;
+  char *in_filename = NULL;
+  char *out_filename = NULL;
+  game_state_t *state = NULL;
+
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], '-i') == 0 && i < argc - 1) {
+      if (io_stdin) {
+        fprintf(stderr, 'Usage: %s [-i filename | --stdin] [-o filename]\n', argv[0]);
+        return 1;
+      }
+      in_filename = argv[i + 1];
+      i++;
+      continue;
+    } else if (strcmp(argv[i], '--stdin') == 0) {
+      if (in_filename != NULL) {
+        fprintf(stderr, 'Usage: %s [-i filename | --stdin] [-o filename]\n', argv[0]);
+        return 1;
+      }
+      io_stdin = true;
+      continue;
+    }
+    if (strcmp(argv[i], '-o') == 0 && i < argc - 1) {
+      out_filename = argv[i + 1];
+      i++;
+      continue;
+    }
+    fprintf(stderr, 'Usage: %s [-i filename | --stdin] [-o filename]\n', argv[0]);
+    return 1;
+  }
+
+  if (in_filename != NULL) {
+    FILE * fp = fopen(in_filename, 'r');
+    if (fp == NULL) {
+      return -1;
+    }
+    state = load_board(fp);
+    initialize_snakes(state);
+  } else if (io_stdin) {
+    state = load_board(stdin);
+    initialize_snakes(state);
+  } else {
+    create_default_state();
+  }
+  update_state(state, deterministic_food);
+  if (out_filename != NULL) {
+    FILE *fp = fopen(out_filename, 'w+');
+    print_board(state, fp);
+  } else {
+    print_board(state, stdout);
+  }
+  free_state(state);
+  return 0;
+}
+```
+
+。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://LianSeKong.github.io/lizi/post/cs61c-sp24-project1-%20snek.html">
+<meta property="og:image" content="https://img.icons8.com/doodle/480/mugman.png">
+<title>cs61c-sp24-project1: snek</title>
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
+
+
+</head>
+<style>
+body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;padding: 45px;font-size: 16px;font-family: sans-serif;line-height: 1.25;}
+#header{display:flex;padding-bottom:8px;border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted));margin-bottom: 16px;}
+#footer {margin-top:64px; text-align: center;font-size: small;}
+
+</style>
+
+<style>
+.postTitle{margin: auto 0;font-size:40px;font-weight:bold;}
+.title-right{display:flex;margin:auto 0 0 auto;}
+.title-right .circle{padding: 14px 16px;margin-right:8px;}
+#postBody{border-bottom: 1px solid var(--color-border-default);padding-bottom:36px;}
+#postBody hr{height:2px;}
+#cmButton{height:48px;margin-top:48px;}
+#comments{margin-top:64px;}
+.g-emoji{font-size:24px;}
+@media (max-width: 600px) {
+    body {padding: 8px;}
+    .postTitle{font-size:24px;}
+}
+.copy-feedback {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 50px;
+    color: var(--color-fg-on-emphasis);
+    background-color: var(--color-fg-muted);
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
+</style>
+
+
+
+
+<body>
+    <div id="header">
+<h1 class="postTitle">cs61c-sp24-project1: snek</h1>
+<div class="title-right">
+    <a href="https://LianSeKong.github.io/lizi" id="buttonHome" class="btn btn-invisible circle" title="首页">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathHome" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+    <a href="https://github.com/LianSeKong/lizi/issues/9" target="_blank" class="btn btn-invisible circle" title="Issue">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathIssue" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+
+    <a class="btn btn-invisible circle" onclick="modeSwitch();" title="切换主题">
+        <svg class="octicon" width="16" height="16" >
+            <path id="themeSwitch" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+
+</div>
+</div>
+    <div id="content">
+<div class="markdown-body" id="postBody"><h1>Snake</h1>
+<blockquote>
+<p>creating a playable snake game</p>
+</blockquote>
+<h2>Conceptual Overview</h2>
+<h3>Snakes</h3>
+<p>A snake game can be represented by a grid of characters.</p>
+<p>The grid contains walls, fruits, and one or more snakes.</p>
+<p>An example of a game is shown below:</p>
+<div class="highlight highlight-source-js"><pre class="notranslate">##############
+#            #
+#    <span class="pl-s1">dv</span>      #
+#     <span class="pl-s1">v</span>   #  #
+#     <span class="pl-s1">v</span>   #  #
+#   <span class="pl-s1">s</span> <span class="pl-c1">&gt;&gt;</span><span class="pl-v">D</span> #  #
+#   <span class="pl-s1">v</span>     #  #
+# <span class="pl-c1">*</span><span class="pl-v">A</span><span class="pl-c1">&lt;</span>  <span class="pl-c1">*</span>  #  #
+#            #
+##############</pre></div>
+<p>The grid has the following special characters:</p>
+<ul>
+<li><code class="notranslate">#</code> denotes a wall.</li>
+<li>(space character) denotes an empty space.</li>
+<li><code class="notranslate">*</code> denotes a fruit.</li>
+<li><code class="notranslate">wasd</code> denotes the tail of a snake.</li>
+<li><code class="notranslate">^&lt;v&gt;</code> denotes the body of a snake.</li>
+<li><code class="notranslate">WASD</code> denotes the head of a snake.</li>
+<li><code class="notranslate">x</code> denotes the head of a snake that has died.</li>
+</ul>
+<p>Each character of the snake tells you what direction the snake is currently heading in:</p>
+<ul>
+<li><code class="notranslate">w</code>, <code class="notranslate">W</code>, or <code class="notranslate">^</code> denotes up</li>
+<li><code class="notranslate">a</code>, <code class="notranslate">A</code>, or <code class="notranslate">&lt;</code> denotes left</li>
+<li><code class="notranslate">s</code>, <code class="notranslate">S</code>, or <code class="notranslate">v</code> denotes down</li>
+<li><code class="notranslate">d</code>, <code class="notranslate">D</code>, or <code class="notranslate">&gt;</code> denotes right</li>
+</ul>
+<p>At each time step, each snakes moves according to the following rules:</p>
+<ul>
+<li>Each snake moves one step in the direction of its head.</li>
+<li>If the head crashes into the body of a snake or a wall, the snake dies and stops moving. When a snake dies, the head is replaced with an <code class="notranslate">x</code>.</li>
+<li>If the head moves into a fruit, the snake eats the fruit and grows by 1 unit in length. Each time fruit is consumed, a new fruit is generated on the board.</li>
+</ul>
+<p>In the example above, after one time step, the board will look like this:</p>
+<pre class="notranslate"><code class="notranslate">##############
+#         *  #
+#     s      #
+#     v   #  #
+#     v   #  #
+#   s &gt;&gt;&gt;D#  #
+#   v     #  #
+# A&lt;&lt;  *  #  #
+#            #
+##############
+</code></pre>
+<p>After one more time step, the board will look like this:</p>
+<pre class="notranslate"><code class="notranslate">##############
+#         *  #
+#     s      #
+#     v   #  #
+#     v   #  #
+#     &gt;&gt;&gt;x#  #
+#   s     #  #
+#A&lt;&lt;&lt;  *  #  #
+#            #
+##############
+</code></pre>
+<p>Snakes are guaranteed to be at least three units long.</p>
+<h3>Numbering snakes</h3>
+<p>Each snake on the board is numbered depending on the position of its tail, in the order that the tails appear in the file (going from top-to-bottom, then left-to-right). For example, consider the following board with four snakes:</p>
+<pre class="notranslate"><code class="notranslate">#############
+#  s  d&gt;&gt;D  #
+#  v   A&lt;a  #
+#  S    W   #
+#       ^   #
+#       w   #
+#############
+</code></pre>
+<p>Snake 0 is the snake with tail <code class="notranslate">s</code>, snake 1 has tail <code class="notranslate">d</code>, snake 2 has tail <code class="notranslate">a</code>, and snake 3 has tail <code class="notranslate">w</code>.</p>
+<p>Once the snakes are numbered from their initial positions, the numbering of the snakes does not change throughout the game.</p>
+<h3>Game board</h3>
+<p>A game board is a grid of characters, not necessarily rectangular. Here's an example of a non-rectangular board:</p>
+<pre class="notranslate"><code class="notranslate">##############
+#            #######
+#####             ##
+#   #             ##
+#####             ######
+#                 ##   #
+#                 ######
+#                 ##
+#                  #
+#      #####       #
+########   #########
+</code></pre>
+<p>Note that each row can have a different number of characters, but will start and end with a wall (<code class="notranslate">#</code>). You can also assume that the board is an enclosed space, so snakes can't travel infinitely far in any direction.</p>
+<h3>The <code class="notranslate">game_state_t</code> struct</h3>
+<p>A snake game is stored in memory in a <code class="notranslate">game_state_t</code> struct, which is defined in <code class="notranslate">state.h</code>. The struct contains the following fields:</p>
+<ul>
+<li><code class="notranslate">unsigned int num_rows</code>: The number of rows in the game board.</li>
+<li><code class="notranslate">char** board</code>: The game board in memory. Each element of the <code class="notranslate">board</code> array is a <code class="notranslate">char*</code> pointer to a character array containing a row of the board. Each row must be terminated by a new line character and must be a valid string.</li>
+<li><code class="notranslate">unsigned int num_snakes</code>: The number of snakes on the board.</li>
+<li><code class="notranslate">snake_t* snakes</code>: An array of <code class="notranslate">snake_t</code> structs.</li>
+</ul>
+<h3>The <code class="notranslate">snake_t</code> struct</h3>
+<p>Also defined in <code class="notranslate">state.h</code>, each <code class="notranslate">snake_t</code> struct contains the following fields:</p>
+<ul>
+<li><code class="notranslate">unsigned int tail_row</code>: The row of the snake's tail.</li>
+<li><code class="notranslate">unsigned int tail_col</code>: The column of the snake's tail.</li>
+<li><code class="notranslate">unsigned int head_row</code>: The row of the snake's head.</li>
+<li><code class="notranslate">unsigned int head_col</code>: The column of the snake's head.</li>
+<li><code class="notranslate">bool live</code>: <code class="notranslate">true</code> if the snake is alive, and <code class="notranslate">false</code> if the snake is dead.</li>
+</ul>
+<p>Please don't modify the provided struct definitions. You should only need to modify <code class="notranslate">state.c</code> <code class="notranslate">snake.c</code>, and <code class="notranslate">custom_tests.c</code> in this project.</p>
+<h2>Task 1: <code class="notranslate">create_default_state</code></h2>
+<p>Implement the <code class="notranslate">create_default_state</code> function in <code class="notranslate">state.c</code>. This function should create a default snake game in memory with the following starting state (which you can hardcode), and return a pointer to the newly created <code class="notranslate">game_state_t</code> struct.</p>
+<pre class="notranslate"><code class="notranslate">####################
+#                  #
+# d&gt;D    *         #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+#                  #
+####################
+</code></pre>
+<markdown-accessiblity-table><table role="table">   <tbody><tr><td colspan="3"><code class="notranslate">create_default_state</code></td></tr><tr><td><b>Arguments</b></td><td colspan="2">None</td></tr><tr><td><b>Return values</b></td><td><code class="notranslate">game_state_t *</code></td><td>A pointer to the newly created <code class="notranslate">game_state_t</code> struct.</td></tr></tbody></table></markdown-accessiblity-table>
+<h3>Hints</h3>
+<ul>
+<li>The board has 18 rows, and each row has 20 columns. The fruit is at row 2, column 9 (zero-indexed). The tail is at row 2, column 2, and the head is at row 2, column 4.</li>
+<li>Which part of memory (code, static, stack, heap) should you store the new game in?</li>
+<li><code class="notranslate">strcpy</code> may be helpful.</li>
+</ul>
+<h2>Solution</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-c">/* Task 1 */</span>
+<span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-en">create_default_state</span>() {
+  <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">num_cols</span> <span class="pl-c1">=</span> <span class="pl-c1">20</span>;
+  <span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-s1">state</span> <span class="pl-c1">=</span> (<span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span>)<span class="pl-en">malloc</span>(<span class="pl-k">sizeof</span>(<span class="pl-s1">game_state_t</span>));
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_rows</span> <span class="pl-c1">=</span> <span class="pl-c1">18</span>;
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_snakes</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span>;
+
+  <span class="pl-c">// init board</span>
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span> <span class="pl-c1">=</span> (<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-c1">*</span>)<span class="pl-en">calloc</span>(<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_rows</span>, <span class="pl-k">sizeof</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span>));
+  <span class="pl-k">for</span> (<span class="pl-smi">size_t</span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_rows</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>) {
+    <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">i</span>] <span class="pl-c1">=</span> (<span class="pl-smi">char</span> <span class="pl-c1">*</span>)<span class="pl-en">calloc</span>(<span class="pl-s1">num_cols</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>, <span class="pl-k">sizeof</span>(<span class="pl-smi">char</span>));
+  }
+  <span class="pl-c">// begin an end row</span>
+  <span class="pl-en">strcpy</span>(<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-c1">0</span>], <span class="pl-s">"####################"</span>);
+  <span class="pl-en">strcpy</span>(<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_rows</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span>], <span class="pl-s">"####################"</span>);
+  <span class="pl-c">// main body</span>
+  <span class="pl-k">for</span> (<span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_rows</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>) {
+    <span class="pl-en">strcpy</span>(<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">i</span>], <span class="pl-s">"#                  #"</span>);
+  }
+
+  <span class="pl-c">// init snake</span>
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span> <span class="pl-c1">=</span> (<span class="pl-smi">snake_t</span> <span class="pl-c1">*</span>)<span class="pl-en">malloc</span>(<span class="pl-k">sizeof</span>(<span class="pl-s1">snake_t</span>) <span class="pl-c1">*</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_snakes</span>);
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span>[<span class="pl-c1">0</span>].<span class="pl-c1">tail_row</span> <span class="pl-c1">=</span> <span class="pl-c1">2</span>;
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span>[<span class="pl-c1">0</span>].<span class="pl-c1">tail_col</span> <span class="pl-c1">=</span> <span class="pl-c1">2</span>;
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span>[<span class="pl-c1">0</span>].<span class="pl-c1">head_row</span> <span class="pl-c1">=</span> <span class="pl-c1">2</span>;
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span>[<span class="pl-c1">0</span>].<span class="pl-c1">head_col</span> <span class="pl-c1">=</span> <span class="pl-c1">4</span>;
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span>[<span class="pl-c1">0</span>].<span class="pl-c1">live</span> <span class="pl-c1">=</span> true;
+
+  <span class="pl-c">// init fruit  </span>
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-c1">2</span>][<span class="pl-c1">9</span>] <span class="pl-c1">=</span> <span class="pl-c1">'*'</span>;
+
+  <span class="pl-c">// render board</span>
+  <span class="pl-smi">snake_t</span> <span class="pl-s1">snake</span> <span class="pl-c1">=</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span>[<span class="pl-c1">0</span>];
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-c1">2</span>][<span class="pl-c1">2</span>] <span class="pl-c1">=</span> <span class="pl-c1">'d'</span>;
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">snake</span>.<span class="pl-c1">tail_row</span>][<span class="pl-s1">snake</span>.<span class="pl-c1">tail_col</span>] <span class="pl-c1">=</span> <span class="pl-c1">'d'</span>;
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">snake</span>.<span class="pl-c1">head_row</span>][<span class="pl-s1">snake</span>.<span class="pl-c1">head_col</span>] <span class="pl-c1">=</span> <span class="pl-c1">'D'</span>;
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">snake</span>.<span class="pl-c1">head_row</span>][<span class="pl-s1">snake</span>.<span class="pl-c1">head_col</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span>] <span class="pl-c1">=</span> <span class="pl-c1">'&gt;'</span>;
+  <span class="pl-k">return</span> <span class="pl-s1">state</span>;
+}</pre></div>
+<h2>Task 2: <code class="notranslate">free_state</code></h2>
+<p>Implement the <code class="notranslate">free_state</code> function in <code class="notranslate">state.c</code>. This function should free all memory allocated for the given state, including all <code class="notranslate">snake</code> structs and all <code class="notranslate">state</code>-&gt;<code class="notranslate">board</code> contents.</p>
+<markdown-accessiblity-table><table role="table">   <tbody><tr><td colspan="3"><code class="notranslate">free_state</code></td></tr><tr><td><b>Arguments</b></td><td><code class="notranslate">game_state_t* state</code></td><td>A pointer to the <code class="notranslate">game_state_t</code> struct to be freed</td></tr><tr><td><b>Return values</b></td><td colspan="2">None</td></tr></tbody></table></markdown-accessiblity-table>
+<h2>Solution</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-c">/* Task 2 */</span>
+<span class="pl-smi">void</span> <span class="pl-en">free_state</span>(<span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-s1">state</span>)
+{
+  <span class="pl-k">for</span> (<span class="pl-smi">size_t</span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_rows</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>) {
+    <span class="pl-en">free</span>(<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">i</span>]);
+  }
+  <span class="pl-en">free</span>(<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span>);
+  <span class="pl-en">free</span>(<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>);
+  <span class="pl-en">free</span>(<span class="pl-s1">state</span>);
+  <span class="pl-k">return</span>;
+}</pre></div>
+<h2>Task 3: <code class="notranslate">print_board</code></h2>
+<p>Implement the <code class="notranslate">print_board</code> function in <code class="notranslate">state.c</code>. This function should print out the given game board to the given file pointer.</p>
+<markdown-accessiblity-table><table role="table">   <tbody><tr><td colspan="3"><code class="notranslate">print_board</code></td></tr><tr><td rowspan="2"><b>Arguments</b></td><td><code class="notranslate">game_state_t* state</code></td><td>A pointer to the <code class="notranslate">game_state_t</code> struct to be printed</td></tr><tr><td><code class="notranslate">FILE* fp</code></td><td>A pointer to the file object where the board should be printed to</td></tr><tr><td><b>Return values</b></td><td colspan="2">None</td></tr></tbody></table></markdown-accessiblity-table>
+<h3>Hints</h3>
+<ul>
+<li>The <code class="notranslate">fprintf</code> function will help you print out characters and/or strings to a given file pointer.</li>
+</ul>
+<h2>Solution</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-smi">void</span> <span class="pl-en">print_board</span>(<span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-s1">state</span>, <span class="pl-smi">FILE</span> <span class="pl-c1">*</span><span class="pl-s1">fp</span>)
+{
+  <span class="pl-k">for</span> (<span class="pl-smi">size_t</span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_rows</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>) {
+    <span class="pl-en">fprintf</span>(<span class="pl-s1">fp</span>, <span class="pl-s">"%s\n"</span>, <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">i</span>]);
+  }
+  <span class="pl-k">return</span>;
+}</pre></div>
+<h2>Task 4: <code class="notranslate">update_state</code></h2>
+<p>Implement the <code class="notranslate">update_state</code> function in <code class="notranslate">state.c</code>. This function should move the snakes one timestep according to the rules of the game.</p>
+<p>Helper functions are not graded; for this task, we'll only be checking that <code class="notranslate">update_state</code> is correct.</p>
+<h3>Task 4.1: Helpers</h3>
+<p>We have provided the following helper function definitions that you can implement. These functions are entirely independent of any game board or snake; they only take in a single character and output some information about that character.</p>
+<ul>
+<li><code class="notranslate">bool is_tail(char c)</code>: Returns true if <code class="notranslate">c</code> is part of the snake's tail. The snake's tail consists of these characters: <code class="notranslate">wasd</code>. Returns false otherwise.</li>
+<li><code class="notranslate">bool is_head(char c)</code>: Returns true if <code class="notranslate">c</code> is part of the snake's head. The snake's head consists of these characters: <code class="notranslate">WASDx</code>. Returns false otherwise.</li>
+<li><code class="notranslate">bool is_snake(char c)</code>: Returns true if <code class="notranslate">c</code> is part of the snake. The snake consists of these characters: <code class="notranslate">wasd^&lt;v&gt;WASDx</code>. Returns false otherwise.</li>
+<li><code class="notranslate">char body_to_tail(char c)</code>: Converts a character in the snake's body (<code class="notranslate">^&lt;v&gt;</code>) to the matching character representing the snake's tail (<code class="notranslate">wasd</code>). The output may be undefined for characters that are not a snake's body.</li>
+<li><code class="notranslate">char head_to_body(char c)</code>: Converts a character in the snake's head (<code class="notranslate">WASD</code>) to the matching character representing the snake's body (<code class="notranslate">^&lt;v&gt;</code>). The output may be undefined for characters that are not a snake's head.</li>
+<li><code class="notranslate">unsigned int get_next_row(unsigned int cur_row, char c)</code>: Returns <code class="notranslate">cur_row + 1</code> if <code class="notranslate">c</code> is <code class="notranslate">v</code> or <code class="notranslate">s</code> or <code class="notranslate">S</code>. Returns <code class="notranslate">cur_row - 1</code> if <code class="notranslate">c</code> is <code class="notranslate">^</code> or <code class="notranslate">w</code> or <code class="notranslate">W</code>. Returns <code class="notranslate">cur_row</code> otherwise.</li>
+<li><code class="notranslate">unsigned int get_next_col(unsigned int cur_col, char c)</code>: Returns <code class="notranslate">cur_col + 1</code> if <code class="notranslate">c</code> is <code class="notranslate">&gt;</code> or <code class="notranslate">d</code> or <code class="notranslate">D</code>. Returns <code class="notranslate">cur_col - 1</code> if <code class="notranslate">c</code> is <code class="notranslate">&lt;</code> or <code class="notranslate">a</code> or <code class="notranslate">A</code>. Returns <code class="notranslate">cur_col</code> otherwise.</li>
+</ul>
+<p>Unit tests are not provided for these helper functions, so you'll have to write your own tests in <code class="notranslate">custom_tests.c</code> to make sure that these are working as expected. Make sure that these tests comprehensively test your helper functions--our autograder will run your tests on buggy implementations to make sure that your tests can catch bugs!</p>
+<p>When writing a unit test, the test function should return <code class="notranslate">false</code> if the test fails, and <code class="notranslate">true</code> if the test passes. You can use <code class="notranslate">printf</code> to print out debugging statements. Some of the assert helper functions in <code class="notranslate">asserts.h</code> might be useful.</p>
+<p>Once you've written your own unit tests, you can run them with <code class="notranslate">make run-custom-tests</code> and <code class="notranslate">make debug-custom-tests</code>.</p>
+<h2>Solution</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-k">static</span> <span class="pl-smi">bool</span> <span class="pl-en">is_tail</span>(<span class="pl-smi">char</span> <span class="pl-s1">c</span>) {
+  <span class="pl-k">return</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'w'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'a'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'s'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'d'</span>;
+}
+<span class="pl-k">static</span> <span class="pl-smi">bool</span> <span class="pl-en">is_head</span>(<span class="pl-smi">char</span> <span class="pl-s1">c</span>) {
+  <span class="pl-k">return</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'W'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'A'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'S'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'D'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'x'</span>;
+}
+<span class="pl-k">static</span> <span class="pl-smi">bool</span> <span class="pl-en">is_snake</span>(<span class="pl-smi">char</span> <span class="pl-s1">c</span>) {
+  <span class="pl-k">return</span> <span class="pl-en">is_tail</span>(<span class="pl-s1">c</span>) <span class="pl-c1">||</span> <span class="pl-en">is_head</span>(<span class="pl-s1">c</span>) <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'v'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'^'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'&lt;'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'&gt;'</span>;
+}
+<span class="pl-k">static</span> <span class="pl-smi">char</span> <span class="pl-en">body_to_tail</span>(<span class="pl-smi">char</span> <span class="pl-s1">ch</span>) {
+  <span class="pl-k">switch</span> (<span class="pl-s1">ch</span>) {
+      <span class="pl-k">case</span> <span class="pl-c1">'^'</span>:
+          <span class="pl-s1">ch</span> <span class="pl-c1">=</span> <span class="pl-c1">'w'</span>;
+          <span class="pl-k">break</span>;
+      <span class="pl-k">case</span> <span class="pl-c1">'v'</span>:
+          <span class="pl-s1">ch</span> <span class="pl-c1">=</span> <span class="pl-c1">'s'</span>;
+          <span class="pl-k">break</span>;
+      <span class="pl-k">case</span> <span class="pl-c1">'&gt;'</span>:
+          <span class="pl-s1">ch</span> <span class="pl-c1">=</span> <span class="pl-c1">'d'</span>;
+          <span class="pl-k">break</span>;
+      <span class="pl-k">case</span> <span class="pl-c1">'&lt;'</span>:
+          <span class="pl-s1">ch</span> <span class="pl-c1">=</span> <span class="pl-c1">'a'</span>;
+          <span class="pl-k">break</span>;
+      <span class="pl-k">default</span>:
+          <span class="pl-s1">ch</span> <span class="pl-c1">=</span> <span class="pl-c1">'?'</span>;
+          <span class="pl-k">break</span>;
+  }
+  <span class="pl-k">return</span> <span class="pl-s1">ch</span>;
+}
+<span class="pl-k">static</span> <span class="pl-smi">char</span> <span class="pl-en">head_to_body</span>(<span class="pl-smi">char</span> <span class="pl-s1">c</span>) {
+  <span class="pl-smi">char</span> <span class="pl-s1">cb</span>;
+  <span class="pl-k">switch</span> (<span class="pl-s1">c</span>) {
+      <span class="pl-k">case</span> <span class="pl-c1">'W'</span>:
+        <span class="pl-s1">cb</span> <span class="pl-c1">=</span> <span class="pl-c1">'^'</span>;
+        <span class="pl-k">break</span>;
+      <span class="pl-k">case</span> <span class="pl-c1">'S'</span>:
+        <span class="pl-s1">cb</span> <span class="pl-c1">=</span> <span class="pl-c1">'v'</span>;
+        <span class="pl-k">break</span>;
+      <span class="pl-k">case</span> <span class="pl-c1">'A'</span>:
+        <span class="pl-s1">cb</span> <span class="pl-c1">=</span> <span class="pl-c1">'&lt;'</span>;
+        <span class="pl-k">break</span>;
+      <span class="pl-k">case</span> <span class="pl-c1">'D'</span>:
+        <span class="pl-s1">cb</span> <span class="pl-c1">=</span> <span class="pl-c1">'&gt;'</span>;
+        <span class="pl-k">break</span>;
+      <span class="pl-k">default</span>:
+        <span class="pl-s1">cb</span> <span class="pl-c1">=</span> <span class="pl-c1">'?'</span>;
+  }
+  <span class="pl-k">return</span> <span class="pl-s1">cb</span>;
+}
+
+<span class="pl-k">static</span> <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-en">get_next_row</span>(<span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">cur_row</span>, <span class="pl-smi">char</span> <span class="pl-s1">c</span>) {
+  <span class="pl-k">if</span> (<span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'v'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'s'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'S'</span>) {
+    <span class="pl-s1">cur_row</span> <span class="pl-c1">+=</span> <span class="pl-c1">1</span>;
+  }
+  <span class="pl-k">else</span> <span class="pl-k">if</span> (<span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'^'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'w'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'W'</span>) {
+    <span class="pl-s1">cur_row</span> <span class="pl-c1">-=</span> <span class="pl-c1">1</span>;
+  }
+  <span class="pl-k">return</span> <span class="pl-s1">cur_row</span>;
+}
+
+<span class="pl-k">static</span> <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-en">get_next_col</span>(<span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">cur_col</span>, <span class="pl-smi">char</span> <span class="pl-s1">c</span>) {
+  <span class="pl-k">if</span> (<span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'&gt;'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'d'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'D'</span>) {
+    <span class="pl-s1">cur_col</span> <span class="pl-c1">+=</span> <span class="pl-c1">1</span>;
+  }
+  <span class="pl-k">else</span> <span class="pl-k">if</span> (<span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'&lt;'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'a'</span> <span class="pl-c1">||</span> <span class="pl-s1">c</span> <span class="pl-c1">==</span> <span class="pl-c1">'A'</span>) {
+    <span class="pl-s1">cur_col</span> <span class="pl-c1">-=</span> <span class="pl-c1">1</span>;
+  }
+  <span class="pl-k">return</span> <span class="pl-s1">cur_col</span>;
+}</pre></div>
+<h3>Task 4.2: <code class="notranslate">next_square</code></h3>
+<p>Implement the <code class="notranslate">next_square</code> helper function in <code class="notranslate">state.c</code>. This function returns the character in the cell the given snake is moving into. This function should not modify anything in the game stored in memory.</p>
+<markdown-accessiblity-table><table role="table">   <tbody><tr><td colspan="3"><code class="notranslate">next_square</code></td></tr><tr><td rowspan="2"><b>Arguments</b></td><td><code class="notranslate">game_state_t* state</code></td><td>A pointer to the <code class="notranslate">game_state_t</code> struct to be analyzed</td></tr><tr><td><code class="notranslate">int snum</code></td><td>The index of the snake to be analyzed</td></tr><tr><td><b>Return values</b></td><td><code class="notranslate">char</code></td><td>The character in the cell the given snake is moving into</td></tr></tbody></table></markdown-accessiblity-table>
+<p>As an example, consider the following board:</p>
+<pre class="notranslate"><code class="notranslate">##############
+#            #
+#            #
+#            #
+#   d&gt;D*     #
+#            #
+#       s    #
+#       v    #
+#       S    #
+##############
+</code></pre>
+<p>Assuming that <code class="notranslate">state</code> is a pointer to this game state, then <code class="notranslate">next_square(state, 0)</code> should return <code class="notranslate">*</code>, because the head of snake 0 is moving into a cell with <code class="notranslate">*</code> in it. Similarly, <code class="notranslate">next_square(state, 1)</code> should return <code class="notranslate">#</code> for snake 1.</p>
+<p>The helper functions you wrote earlier might be helpful for this function (and the rest of this task too). Also, check out <code class="notranslate">get_board_at</code> and <code class="notranslate">set_board_at</code>, which are helper functions we wrote for you.</p>
+<p>Use <code class="notranslate">make run-unit-tests</code> and <code class="notranslate">make debug-unit-tests</code> to run the provided unit tests. You can also use <code class="notranslate">p print_board(state, stdout)</code> to print out your entire board while debugging in <code class="notranslate">cgdb</code>.</p>
+<h2>Solution</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-k">static</span> <span class="pl-smi">char</span> <span class="pl-en">next_square</span>(<span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-s1">state</span>, <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">snum</span>) {
+  <span class="pl-smi">snake_t</span> <span class="pl-s1">snake</span> <span class="pl-c1">=</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span>[<span class="pl-s1">snum</span>];
+  <span class="pl-smi">char</span> <span class="pl-s1">head_char</span> <span class="pl-c1">=</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">snake</span>.<span class="pl-c1">head_row</span>][<span class="pl-s1">snake</span>.<span class="pl-c1">head_col</span>];
+  <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">next_col</span> <span class="pl-c1">=</span> <span class="pl-en">get_next_col</span>(<span class="pl-s1">snake</span>.<span class="pl-c1">head_col</span>, <span class="pl-s1">head_char</span>);
+  <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">next_row</span> <span class="pl-c1">=</span> <span class="pl-en">get_next_row</span>(<span class="pl-s1">snake</span>.<span class="pl-c1">head_row</span>, <span class="pl-s1">head_char</span>);
+  <span class="pl-k">return</span> <span class="pl-en">get_board_at</span>(<span class="pl-s1">state</span>, <span class="pl-s1">next_row</span>, <span class="pl-s1">next_col</span>);
+}</pre></div>
+<h3>Task 4.3: <code class="notranslate">update_head</code></h3>
+<p>Implement the <code class="notranslate">update_head</code> function in <code class="notranslate">state.c</code>. This function will update the head of the snake.</p>
+<p>Remember that you will need to update the head both on the game board and in the <code class="notranslate">snake_t</code> struct. On the game board, add a character where the snake is moving. In the <code class="notranslate">snake_t</code> struct, update the row and column of the head.</p>
+<markdown-accessiblity-table><table role="table">   <tbody><tr><td colspan="3"><code class="notranslate">update_head</code></td></tr><tr><td rowspan="2"><b>Arguments</b></td><td><code class="notranslate">game_state_t* state</code></td><td>A pointer to the <code class="notranslate">game_state_t</code> struct to be updated</td></tr><tr><td><code class="notranslate">int snum</code></td><td>The index of the snake to be updated</td></tr><tr><td><b>Return values</b></td><td colspan="2">None</td></tr></tbody></table></markdown-accessiblity-table>
+<p>As an example, consider the following board:</p>
+<pre class="notranslate"><code class="notranslate">##############
+#   d&gt;D      #
+#        *   #
+#        W   #
+#        ^   #
+#        ^   #
+#        w   #
+#            #
+#            #
+##############
+
+
+</code></pre>
+<p>Assuming that <code class="notranslate">state</code> is a pointer to this game state, then <code class="notranslate">update_head(state, 0)</code> will move the head of snake 0, leaving all other snakes unchanged. In the <code class="notranslate">snake_t</code> struct corresponding to snake 0, the <code class="notranslate">head_col</code> value should be updated from 6 to 7, and the <code class="notranslate">head_row</code> value should stay unchanged at 1. The new board will look like this:</p>
+<pre class="notranslate"><code class="notranslate">##############
+#   d&gt;&gt;D     #
+#        *   #
+#        W   #
+#        ^   #
+#        ^   #
+#        w   #
+#            #
+#            #
+##############
+
+
+</code></pre>
+<p>Note that this function ignores food, walls, and snake bodies when moving the head.</p>
+<h2>Solution</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-k">static</span> <span class="pl-smi">void</span> <span class="pl-en">update_head</span>(<span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-s1">state</span>, <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">snum</span>) {
+  <span class="pl-smi">snake_t</span> <span class="pl-c1">*</span><span class="pl-s1">snake</span> <span class="pl-c1">=</span> (<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span>) <span class="pl-c1">+</span> <span class="pl-s1">snum</span>;
+  <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">cur_row</span> <span class="pl-c1">=</span> <span class="pl-s1">snake</span><span class="pl-c1">-&gt;</span><span class="pl-c1">head_row</span>;
+  <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">cur_col</span> <span class="pl-c1">=</span> <span class="pl-s1">snake</span><span class="pl-c1">-&gt;</span><span class="pl-c1">head_col</span>;
+  <span class="pl-smi">char</span> <span class="pl-s1">cur_char</span> <span class="pl-c1">=</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">cur_row</span>][<span class="pl-s1">cur_col</span>];
+  <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">next_row</span> <span class="pl-c1">=</span> <span class="pl-en">get_next_row</span>(<span class="pl-s1">cur_row</span>, <span class="pl-s1">cur_char</span>);
+  <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">next_col</span> <span class="pl-c1">=</span> <span class="pl-en">get_next_col</span>(<span class="pl-s1">cur_col</span>, <span class="pl-s1">cur_char</span>);
+  <span class="pl-en">set_board_at</span>(<span class="pl-s1">state</span>, <span class="pl-s1">next_row</span>, <span class="pl-s1">next_col</span>, <span class="pl-s1">cur_char</span>);
+  <span class="pl-en">set_board_at</span>(<span class="pl-s1">state</span>, <span class="pl-s1">cur_row</span>, <span class="pl-s1">cur_col</span>, <span class="pl-en">head_to_body</span>(<span class="pl-s1">cur_char</span>));
+  <span class="pl-s1">snake</span><span class="pl-c1">-&gt;</span><span class="pl-c1">head_row</span> <span class="pl-c1">=</span> <span class="pl-s1">next_row</span>;
+  <span class="pl-s1">snake</span><span class="pl-c1">-&gt;</span><span class="pl-c1">head_col</span> <span class="pl-c1">=</span> <span class="pl-s1">next_col</span>;
+  <span class="pl-k">return</span>;
+}</pre></div>
+<h3>Task 4.4: <code class="notranslate">update_tail</code></h3>
+<p>Implement the <code class="notranslate">update_tail</code> function in <code class="notranslate">state.c</code>. This function will update the tail of the snake.</p>
+<p>Remember that you will need to update the tail both on the game board and in the <code class="notranslate">snake_t</code> struct. On the game board, blank out the current tail, and change the new tail from a body character (<code class="notranslate">^&lt;v&gt;</code>) into a tail character (<code class="notranslate">wasd</code>). In the <code class="notranslate">snake_t</code> struct, update the row and column of the tail.</p>
+<markdown-accessiblity-table><table role="table">   <tbody><tr><td colspan="3"><code class="notranslate">update_tail</code></td></tr><tr><td rowspan="2"><b>Arguments</b></td><td><code class="notranslate">game_state_t* state</code></td><td>A pointer to the <code class="notranslate">game_state_t</code> struct to be updated</td></tr><tr><td><code class="notranslate">int snum</code></td><td>The index of the snake to be updated</td></tr><tr><td><b>Return values</b></td><td colspan="2">None</td></tr></tbody></table></markdown-accessiblity-table>
+<p>As an example, consider the following board:</p>
+<pre class="notranslate"><code class="notranslate">##############
+#   d&gt;D      #
+#        *   #
+#        W   #
+#        ^   #
+#        ^   #
+#        w   #
+#            #
+#            #
+##############
+</code></pre>
+<p>Assuming that <code class="notranslate">state</code> is a pointer to this game state, then <code class="notranslate">update_tail(state, 1)</code> will move the tail of snake 1, leaving all other snakes unchanged. In the <code class="notranslate">snake_t</code> struct corresponding to snake 1, the <code class="notranslate">tail_row</code> value should be updated from 6 to 5, and the <code class="notranslate">tail_col</code> value should stay unchanged at 9. The new board will look like this:</p>
+<pre class="notranslate"><code class="notranslate">##############
+#   d&gt;D      #
+#        *   #
+#        W   #
+#        ^   #
+#        w   #
+#            #
+#            #
+#            #
+##############
+</code></pre>
+<h2>Solution</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-k">static</span> <span class="pl-smi">void</span> <span class="pl-en">update_tail</span>(<span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-s1">state</span>, <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">snum</span>) {
+  <span class="pl-smi">snake_t</span> <span class="pl-c1">*</span><span class="pl-s1">snake_ptr</span> <span class="pl-c1">=</span> <span class="pl-c1">&amp;</span><span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span>[<span class="pl-s1">snum</span>];
+  <span class="pl-smi">char</span> <span class="pl-s1">tail_char</span> <span class="pl-c1">=</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">tail_row</span>][<span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">tail_col</span>];
+  <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">next_row</span> <span class="pl-c1">=</span> <span class="pl-en">get_next_row</span>(<span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">tail_row</span>, <span class="pl-s1">tail_char</span>);
+  <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">next_col</span> <span class="pl-c1">=</span> <span class="pl-en">get_next_col</span>(<span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">tail_col</span>, <span class="pl-s1">tail_char</span>);
+  <span class="pl-en">set_board_at</span>(<span class="pl-s1">state</span>, <span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">tail_row</span>, <span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">tail_col</span>, <span class="pl-c1">' '</span>);
+  <span class="pl-en">set_board_at</span>(<span class="pl-s1">state</span>, <span class="pl-s1">next_row</span>, <span class="pl-s1">next_col</span>, <span class="pl-en">body_to_tail</span>(<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">next_row</span>][<span class="pl-s1">next_col</span>]));
+  <span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">tail_row</span> <span class="pl-c1">=</span> <span class="pl-s1">next_row</span>;
+  <span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">tail_col</span> <span class="pl-c1">=</span> <span class="pl-s1">next_col</span>;
+  <span class="pl-k">return</span>;
+}</pre></div>
+<h3>Task 4.5: <code class="notranslate">update_state</code></h3>
+<p>Using the helpers you created, implement <code class="notranslate">update_state</code> in <code class="notranslate">state.c</code>.</p>
+<p>As a reminder, the rules for moving a snake are as follows:</p>
+<ul>
+<li>Each snake moves one step in the direction of its head.</li>
+<li>If the head crashes into the body of a snake or a wall, the snake dies and stops moving. When a snake dies, the head is replaced with an <code class="notranslate">x</code>.</li>
+<li>If the head moves into a fruit, the snake eats the fruit and grows by 1 unit in length. (You can implement growing by 1 unit by updating the head without updating the tail.) Each time fruit is consumed, a new fruit is generated on the board.</li>
+</ul>
+<p>The <code class="notranslate">int (*add_food)(game_state_t* state)</code> argument is a function pointer, which means that <code class="notranslate">add_food</code> is a pointer to the code section of memory. The code that <code class="notranslate">add_food</code> is pointing at is a function that takes in <code class="notranslate">game_state_t* state</code> as an argument and returns an <code class="notranslate">int</code>. You can call this function with <code class="notranslate">add_food(x)</code>, replacing <code class="notranslate">x</code> with your argument, to add a fruit to the board.</p>
+<markdown-accessiblity-table><table role="table">   <tbody><tr><td colspan="3"><code class="notranslate">update_state</code></td></tr><tr><td rowspan="2"><b>Arguments</b></td><td><code class="notranslate">game_state_t* state</code></td><td>A pointer to the <code class="notranslate">game_state_t</code> struct to be updated</td></tr><tr><td><code class="notranslate">int (*add_food)(game_state_t* state)</code></td><td>A pointer to a function that will add fruit to the board</td></tr><tr><td><b>Return values</b></td><td colspan="2">None</td></tr></tbody></table></markdown-accessiblity-table>
+<h2>Solution</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-smi">void</span> <span class="pl-en">update_state</span>(<span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-s1">state</span>, <span class="pl-smi">int</span> (<span class="pl-c1">*</span><span class="pl-s1">add_food</span>)(<span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-s1">state</span>))
+{
+  <span class="pl-k">for</span> (<span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_snakes</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+  {
+    <span class="pl-smi">snake_t</span> <span class="pl-c1">*</span><span class="pl-s1">snake_ptr</span> <span class="pl-c1">=</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span> <span class="pl-c1">+</span> <span class="pl-s1">i</span>;
+    <span class="pl-smi">char</span> <span class="pl-s1">head_char</span> <span class="pl-c1">=</span> <span class="pl-en">get_board_at</span>(<span class="pl-s1">state</span>, <span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">head_row</span>, <span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">head_col</span>);
+    <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">next_row</span> <span class="pl-c1">=</span> <span class="pl-en">get_next_row</span>(<span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">head_row</span>, <span class="pl-s1">head_char</span>);
+    <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">next_col</span> <span class="pl-c1">=</span> <span class="pl-en">get_next_col</span>(<span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">head_col</span>, <span class="pl-s1">head_char</span>);
+    <span class="pl-smi">char</span> <span class="pl-s1">next_char</span> <span class="pl-c1">=</span> <span class="pl-en">get_board_at</span>(<span class="pl-s1">state</span>, <span class="pl-s1">next_row</span>, <span class="pl-s1">next_col</span>);
+    <span class="pl-k">if</span> (<span class="pl-en">is_snake</span>(<span class="pl-s1">next_char</span>) <span class="pl-c1">||</span> <span class="pl-s1">next_char</span> <span class="pl-c1">==</span> <span class="pl-c1">'#'</span>) {
+      <span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">live</span> <span class="pl-c1">=</span> false;
+      <span class="pl-en">set_board_at</span>(<span class="pl-s1">state</span>, <span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">head_row</span>, <span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">head_col</span>, <span class="pl-c1">'x'</span>);
+    } <span class="pl-k">else</span> <span class="pl-k">if</span> (<span class="pl-s1">next_char</span> <span class="pl-c1">==</span> <span class="pl-c1">'*'</span>) {
+      <span class="pl-en">update_head</span>(<span class="pl-s1">state</span>, <span class="pl-s1">i</span>);
+      <span class="pl-en">add_food</span>(<span class="pl-s1">state</span>);
+    } <span class="pl-k">else</span> {
+      <span class="pl-en">update_head</span>(<span class="pl-s1">state</span>, <span class="pl-s1">i</span>);
+      <span class="pl-en">update_tail</span>(<span class="pl-s1">state</span>, <span class="pl-s1">i</span>);
+    }
+  }
+  <span class="pl-k">return</span>;
+}</pre></div>
+<h2>Task 5: <code class="notranslate">load_board</code></h2>
+<p>Implement the <code class="notranslate">load_board</code> function in <code class="notranslate">state.c</code>. This function will read a game board from a stream (<code class="notranslate">FILE *</code>) into memory. Your implementation of <code class="notranslate">load_board</code> must support reading in from <code class="notranslate">stdin</code> and any other streams, so please do not use anything that does not support <code class="notranslate">stdin</code>, such as seeking, rewinding, or reopening.</p>
+<p>Remember that each row of the game board might have a different number of columns. Your implementation should be memory-efficient and should not allocate significantly more memory than necessary to store the board. For example, if a row is 3 characters long, you shouldn't be allocating 100 bytes of space for that row.</p>
+<p>You must use <code class="notranslate">fgets</code> to read from the file pointer. We reserve the ability to manually regrade your submission if it uses a function other than <code class="notranslate">fgets</code> to read from <code class="notranslate">file</code>. Other string functions, such as <code class="notranslate">strchr</code>, may be helpful here as well!</p>
+<p>Hint: <code class="notranslate">realloc</code> may be helpful for this task.</p>
+<p>Tasks 5 and 6 combined will create a <code class="notranslate">game_state_t</code> struct in memory with all its fields set up. In this task, please set <code class="notranslate">num_snakes</code> to 0 and set the <code class="notranslate">snakes</code> array to <code class="notranslate">NULL</code>, since these will be initialized in task 6.</p>
+<h3>Task 5.1: <code class="notranslate">read_line</code></h3>
+<p>Implement the <code class="notranslate">read_line</code> function in <code class="notranslate">state.c</code>. Given a <code class="notranslate">FILE *</code> <code class="notranslate">file</code>, read a line from <code class="notranslate">file</code> and store the string on the heap. If <code class="notranslate">fgets</code> errors, return <code class="notranslate">NULL</code>.</p>
+<markdown-accessiblity-table><table role="table">   <tbody><tr><td colspan="3"><code class="notranslate">read_line</code></td></tr><tr><td><b>Arguments</b></td><td><code class="notranslate">FILE* file</code></td><td>A file pointer where the string can be read from</td></tr><tr><td><b>Return values</b></td><td><code class="notranslate">char *</code></td><td>A pointer to the newly read string. <code class="notranslate">NULL</code> if there are any errors, or if <code class="notranslate">EOF</code> is reached.</td></tr></tbody></table></markdown-accessiblity-table>
+<h2>Solution</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-en">read_line</span>(<span class="pl-smi">FILE</span> <span class="pl-c1">*</span><span class="pl-s1">fp</span>) {
+  <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">str</span> <span class="pl-c1">=</span> (<span class="pl-smi">char</span> <span class="pl-c1">*</span>) <span class="pl-en">malloc</span>(<span class="pl-k">sizeof</span>(<span class="pl-smi">char</span>) <span class="pl-c1">*</span> <span class="pl-c1">255</span>);
+  <span class="pl-k">if</span> (<span class="pl-en">fgets</span>(<span class="pl-s1">str</span>, <span class="pl-c1">255</span>, <span class="pl-s1">fp</span>) <span class="pl-c1">==</span> <span class="pl-c1">NULL</span>) {
+    <span class="pl-k">return</span> <span class="pl-c1">NULL</span>;
+  }
+  <span class="pl-k">while</span> (<span class="pl-s1">str</span>[<span class="pl-en">strlen</span>(<span class="pl-s1">str</span>) <span class="pl-c1">-</span> <span class="pl-c1">1</span>] <span class="pl-c1">!=</span> <span class="pl-c1">'\n'</span>) {
+    <span class="pl-s1">str</span> <span class="pl-c1">=</span> <span class="pl-en">realloc</span>(<span class="pl-s1">str</span>, <span class="pl-k">sizeof</span>(<span class="pl-smi">char</span>) <span class="pl-c1">*</span> <span class="pl-en">strlen</span>(<span class="pl-s1">str</span>) <span class="pl-c1">*</span> <span class="pl-c1">2</span>);
+    <span class="pl-en">fgets</span>(<span class="pl-s1">str</span> <span class="pl-c1">+</span> <span class="pl-en">strlen</span>(<span class="pl-s1">str</span>), <span class="pl-c1">255</span>, <span class="pl-s1">fp</span>);
+  }
+  <span class="pl-s1">str</span> <span class="pl-c1">=</span> <span class="pl-en">realloc</span>(<span class="pl-s1">str</span>, <span class="pl-k">sizeof</span>(<span class="pl-smi">char</span>) <span class="pl-c1">*</span> (<span class="pl-en">strlen</span>(<span class="pl-s1">str</span>) <span class="pl-c1">+</span> <span class="pl-c1">1</span>));
+  <span class="pl-k">return</span> <span class="pl-s1">str</span>;
+}</pre></div>
+<h3>Task 5.2: <code class="notranslate">load_board</code></h3>
+<p>Using <code class="notranslate">read_line</code>, implement the <code class="notranslate">load_board</code> function in <code class="notranslate">state.c</code>.</p>
+<markdown-accessiblity-table><table role="table">   <tbody><tr><td colspan="3"><code class="notranslate">load_board</code></td></tr><tr><td><b>Arguments</b></td><td><code class="notranslate">FILE* file</code></td><td>A file pointer where the board can be read from</td></tr><tr><td><b>Return values</b></td><td><code class="notranslate">game_state_t *</code></td><td>A pointer to the newly created <code class="notranslate">game_state_t</code> struct. <code class="notranslate">NULL</code> if there are any errors.</td></tr></tbody></table></markdown-accessiblity-table>
+<h2>Solution</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-en">load_board</span>(<span class="pl-smi">FILE</span> <span class="pl-c1">*</span><span class="pl-s1">fp</span>) {
+  <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">capacity</span> <span class="pl-c1">=</span> <span class="pl-c1">255</span>;
+  <span class="pl-smi">game_state_t</span><span class="pl-c1">*</span> <span class="pl-s1">state</span> <span class="pl-c1">=</span> (<span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span>) <span class="pl-en">malloc</span>(<span class="pl-k">sizeof</span>(<span class="pl-s1">game_state_t</span>));
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_snakes</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>;
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span> <span class="pl-c1">=</span> <span class="pl-c1">NULL</span>;
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_rows</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>;
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span> <span class="pl-c1">=</span> (<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-c1">*</span>)<span class="pl-en">calloc</span>(<span class="pl-s1">capacity</span>, <span class="pl-k">sizeof</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span>));
+  <span class="pl-smi">char</span><span class="pl-c1">*</span> <span class="pl-s1">str</span>;
+  <span class="pl-k">while</span> ((<span class="pl-s1">str</span> <span class="pl-c1">=</span> <span class="pl-en">read_line</span>(<span class="pl-s1">fp</span>)) <span class="pl-c1">!=</span> <span class="pl-c1">NULL</span>) {
+    <span class="pl-k">if</span> (<span class="pl-s1">str</span>[<span class="pl-en">strlen</span>(<span class="pl-s1">str</span>) <span class="pl-c1">-</span> <span class="pl-c1">1</span>] <span class="pl-c1">==</span> <span class="pl-c1">'\n'</span>) {
+      <span class="pl-s1">str</span>[<span class="pl-en">strlen</span>(<span class="pl-s1">str</span>) <span class="pl-c1">-</span> <span class="pl-c1">1</span>] <span class="pl-c1">=</span> <span class="pl-c1">'\0'</span>;
+    }
+    <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[(<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_rows</span>)<span class="pl-c1">++</span>] <span class="pl-c1">=</span> <span class="pl-s1">str</span>;
+    <span class="pl-k">if</span> (<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_rows</span> &gt;= <span class="pl-s1">capacity</span>) {
+      <span class="pl-s1">capacity</span> *= <span class="pl-c1">2</span>;
+      <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span> <span class="pl-c1">=</span> (<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-c1">*</span>) <span class="pl-en">realloc</span>(<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>, <span class="pl-k">sizeof</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span>) <span class="pl-c1">*</span> <span class="pl-s1">capacity</span>);
+    }
+  }
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span> <span class="pl-c1">=</span> (<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-c1">*</span>) <span class="pl-en">realloc</span>(<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>, <span class="pl-k">sizeof</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span>) <span class="pl-c1">*</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_rows</span>);
+  <span class="pl-k">return</span> <span class="pl-s1">state</span>;
+}</pre></div>
+<h2>Task 6: <code class="notranslate">initialize_snake</code></h2>
+<p>Implement the <code class="notranslate">initialize_snake</code> function in <code class="notranslate">state.c</code>. This function takes in a game board and creates the array of <code class="notranslate">snake_t</code> structs.</p>
+<h3>Task 6.1: <code class="notranslate">find_head</code></h3>
+<p>Implement the <code class="notranslate">find_head</code> function in <code class="notranslate">state.c</code>. Given a <code class="notranslate">snake_t</code> struct with the tail row and column filled in, this function traces through the board to find the head row and column, and fills in the head row and column in the struct.</p>
+<markdown-accessiblity-table><table role="table">   <tbody><tr><td colspan="3"><code class="notranslate">find_head</code></td></tr><tr><td rowspan="2"><b>Arguments</b></td><td><code class="notranslate">game_state_t* state</code></td><td>A pointer to the <code class="notranslate">game_state_t</code> struct to be analyzed</td></tr><tr><td><code class="notranslate">int snum</code></td><td>The index of the snake to be analyzed</td></tr><tr><td><b>Return values</b></td><td colspan="2">None</td></tr></tbody></table></markdown-accessiblity-table>
+<p>As an example, consider the following board:</p>
+<pre class="notranslate"><code class="notranslate">##############
+#            #
+#        *   #
+#            #
+#   d&gt;v      #
+#     v      #
+#  W  v      #
+#  ^&lt;&lt;&lt;      #
+#            #
+##############
+
+
+</code></pre>
+<p>Assuming that <code class="notranslate">state</code> is a pointer to this game state, then <code class="notranslate">find_head(state, 0)</code> will fill in the <code class="notranslate">head_row</code> and <code class="notranslate">head_col</code> fields of the snake 0 struct with 6 and 3, respectively.</p>
+<h2>Solution</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-k">static</span> <span class="pl-smi">void</span> <span class="pl-en">find_head</span>(<span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-s1">state</span>, <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">snum</span>) {
+  <span class="pl-smi">snake_t</span> <span class="pl-c1">*</span> <span class="pl-s1">snake_ptr</span> <span class="pl-c1">=</span> (<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span>) <span class="pl-c1">+</span> <span class="pl-s1">snum</span>;
+  <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">row</span> <span class="pl-c1">=</span> <span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">tail_row</span>;
+  <span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">col</span> <span class="pl-c1">=</span> <span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">tail_col</span>;
+  <span class="pl-smi">char</span> <span class="pl-s1">ch</span> <span class="pl-c1">=</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">row</span>][<span class="pl-s1">col</span>];
+  <span class="pl-k">while</span> (<span class="pl-en">is_snake</span>(<span class="pl-s1">ch</span>) <span class="pl-c1">&amp;&amp;</span> !<span class="pl-en">is_head</span>(<span class="pl-s1">ch</span>)) {
+    <span class="pl-s1">row</span> <span class="pl-c1">=</span> <span class="pl-en">get_next_row</span>(<span class="pl-s1">row</span>, <span class="pl-s1">ch</span>);
+    <span class="pl-s1">col</span> <span class="pl-c1">=</span> <span class="pl-en">get_next_col</span>(<span class="pl-s1">col</span>, <span class="pl-s1">ch</span>);
+    <span class="pl-s1">ch</span> <span class="pl-c1">=</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">row</span>][<span class="pl-s1">col</span>];
+  }
+  <span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">head_row</span> <span class="pl-c1">=</span> <span class="pl-s1">row</span>;
+  <span class="pl-s1">snake_ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">head_col</span> <span class="pl-c1">=</span> <span class="pl-s1">col</span>;
+  <span class="pl-k">return</span>;
+}</pre></div>
+<h3>Task 6.2: <code class="notranslate">initialize_snake</code></h3>
+<p>Using <code class="notranslate">find_head</code>, implement the <code class="notranslate">initialize_snake</code> function in <code class="notranslate">state.c</code>. You can assume that the state passed into this function is the result of calling <code class="notranslate">load_board</code>, but you may not assume that the <code class="notranslate">snakes</code> array is defined. This means the board-related fields are already filled in, and you only need to fill in <code class="notranslate">num_snakes</code> and create the <code class="notranslate">snakes</code> array.</p>
+<p>You may assume that all snakes on the board start out alive.</p>
+<markdown-accessiblity-table><table role="table">   <tbody><tr><td colspan="3"><code class="notranslate">initialize_snakes</code></td></tr><tr><td><b>Arguments</b></td><td><code class="notranslate">game_state_t* state</code></td><td>A pointer to the <code class="notranslate">game_state_t</code> struct to be filled in</td></tr><tr><td><b>Return values</b></td><td><code class="notranslate">game_state_t* state</code></td><td>A pointer to the <code class="notranslate">game_state_t</code> struct with fields filled in. This can be the same as the struct passed in (you can modify the struct in-place).</td></tr></tbody></table></markdown-accessiblity-table>
+<h2>Solution</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-en">initialize_snakes</span>(<span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-s1">state</span>) {
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span> <span class="pl-c1">=</span> (<span class="pl-smi">snake_t</span> <span class="pl-c1">*</span>)<span class="pl-en">malloc</span>(<span class="pl-k">sizeof</span>(<span class="pl-s1">snake_t</span>) <span class="pl-c1">*</span> <span class="pl-c1">512</span>);
+  <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_snakes</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>;
+  <span class="pl-k">for</span> (<span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_rows</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+  {
+    <span class="pl-smi">char</span><span class="pl-c1">*</span> <span class="pl-s1">row</span> <span class="pl-c1">=</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">board</span>[<span class="pl-s1">i</span>];
+
+    <span class="pl-k">for</span> (<span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">j</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">j</span> <span class="pl-c1">&lt;</span> <span class="pl-en">strlen</span>(<span class="pl-s1">row</span>); <span class="pl-s1">j</span><span class="pl-c1">++</span>)
+    {
+      
+      <span class="pl-smi">char</span> <span class="pl-s1">ch</span> <span class="pl-c1">=</span> <span class="pl-s1">row</span>[<span class="pl-s1">j</span>];
+      <span class="pl-k">if</span> (<span class="pl-en">is_tail</span>(<span class="pl-s1">ch</span>)) {
+        <span class="pl-smi">snake_t</span><span class="pl-c1">*</span> <span class="pl-s1">snake</span> <span class="pl-c1">=</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">snakes</span> <span class="pl-c1">+</span> (<span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_snakes</span>);
+        <span class="pl-s1">snake</span><span class="pl-c1">-&gt;</span><span class="pl-c1">live</span> <span class="pl-c1">=</span> true;
+        <span class="pl-s1">snake</span><span class="pl-c1">-&gt;</span><span class="pl-c1">tail_row</span> <span class="pl-c1">=</span> <span class="pl-s1">i</span>;
+        <span class="pl-s1">snake</span><span class="pl-c1">-&gt;</span><span class="pl-c1">tail_col</span> <span class="pl-c1">=</span> <span class="pl-s1">j</span>;
+        <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_snakes</span> <span class="pl-c1">+=</span> <span class="pl-c1">1</span>;
+      }
+    }
+  }
+  <span class="pl-k">for</span> (<span class="pl-smi">unsigned <span class="pl-smi">int</span></span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">state</span><span class="pl-c1">-&gt;</span><span class="pl-c1">num_snakes</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>) {
+    <span class="pl-en">find_head</span>(<span class="pl-s1">state</span>, <span class="pl-s1">i</span>);
+  }
+  <span class="pl-en">print_board</span>(<span class="pl-s1">state</span>, <span class="pl-s1">stdout</span>);
+  <span class="pl-k">return</span> <span class="pl-s1">state</span>;
+}</pre></div>
+<h2>Task 7: <code class="notranslate">main</code></h2>
+<p>Using the functions you implemented in all the previous tasks, fill in the blanks in <code class="notranslate">snake.c</code>. Each time the <code class="notranslate">snake.c</code> program is run, the board will be updated by one time step.</p>
+<h2>Solution</h2>
+<div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-smi">int</span> <span class="pl-en">main</span>(<span class="pl-smi">int</span> <span class="pl-s1">argc</span>, <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">argv</span>[]) {
+  <span class="pl-smi">bool</span> <span class="pl-s1">io_stdin</span> <span class="pl-c1">=</span> false;
+  <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">in_filename</span> <span class="pl-c1">=</span> <span class="pl-c1">NULL</span>;
+  <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">out_filename</span> <span class="pl-c1">=</span> <span class="pl-c1">NULL</span>;
+  <span class="pl-smi">game_state_t</span> <span class="pl-c1">*</span><span class="pl-s1">state</span> <span class="pl-c1">=</span> <span class="pl-c1">NULL</span>;
+
+  <span class="pl-k">for</span> (<span class="pl-smi">int</span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">argc</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>) {
+    <span class="pl-k">if</span> (<span class="pl-en">strcmp</span>(<span class="pl-s1">argv</span>[<span class="pl-s1">i</span>], <span class="pl-s">"-i"</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span> <span class="pl-c1">&amp;&amp;</span> <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">argc</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span>) {
+      <span class="pl-k">if</span> (<span class="pl-s1">io_stdin</span>) {
+        <span class="pl-en">fprintf</span>(<span class="pl-s1">stderr</span>, <span class="pl-s">"Usage: %s [-i filename | --stdin] [-o filename]\n"</span>, <span class="pl-s1">argv</span>[<span class="pl-c1">0</span>]);
+        <span class="pl-k">return</span> <span class="pl-c1">1</span>;
+      }
+      <span class="pl-s1">in_filename</span> <span class="pl-c1">=</span> <span class="pl-s1">argv</span>[<span class="pl-s1">i</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>];
+      <span class="pl-s1">i</span><span class="pl-c1">++</span>;
+      <span class="pl-k">continue</span>;
+    } <span class="pl-k">else</span> <span class="pl-k">if</span> (<span class="pl-en">strcmp</span>(<span class="pl-s1">argv</span>[<span class="pl-s1">i</span>], <span class="pl-s">"--stdin"</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span>) {
+      <span class="pl-k">if</span> (<span class="pl-s1">in_filename</span> <span class="pl-c1">!=</span> <span class="pl-c1">NULL</span>) {
+        <span class="pl-en">fprintf</span>(<span class="pl-s1">stderr</span>, <span class="pl-s">"Usage: %s [-i filename | --stdin] [-o filename]\n"</span>, <span class="pl-s1">argv</span>[<span class="pl-c1">0</span>]);
+        <span class="pl-k">return</span> <span class="pl-c1">1</span>;
+      }
+      <span class="pl-s1">io_stdin</span> <span class="pl-c1">=</span> true;
+      <span class="pl-k">continue</span>;
+    }
+    <span class="pl-k">if</span> (<span class="pl-en">strcmp</span>(<span class="pl-s1">argv</span>[<span class="pl-s1">i</span>], <span class="pl-s">"-o"</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span> <span class="pl-c1">&amp;&amp;</span> <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">argc</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span>) {
+      <span class="pl-s1">out_filename</span> <span class="pl-c1">=</span> <span class="pl-s1">argv</span>[<span class="pl-s1">i</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>];
+      <span class="pl-s1">i</span><span class="pl-c1">++</span>;
+      <span class="pl-k">continue</span>;
+    }
+    <span class="pl-en">fprintf</span>(<span class="pl-s1">stderr</span>, <span class="pl-s">"Usage: %s [-i filename | --stdin] [-o filename]\n"</span>, <span class="pl-s1">argv</span>[<span class="pl-c1">0</span>]);
+    <span class="pl-k">return</span> <span class="pl-c1">1</span>;
+  }
+
+  <span class="pl-k">if</span> (<span class="pl-s1">in_filename</span> <span class="pl-c1">!=</span> <span class="pl-c1">NULL</span>) {
+    <span class="pl-smi">FILE</span> <span class="pl-c1">*</span> <span class="pl-s1">fp</span> <span class="pl-c1">=</span> <span class="pl-en">fopen</span>(<span class="pl-s1">in_filename</span>, <span class="pl-s">"r"</span>);
+    <span class="pl-k">if</span> (<span class="pl-s1">fp</span> <span class="pl-c1">==</span> <span class="pl-c1">NULL</span>) {
+      <span class="pl-k">return</span> <span class="pl-c1">-1</span>;
+    }
+    <span class="pl-s1">state</span> <span class="pl-c1">=</span> <span class="pl-en">load_board</span>(<span class="pl-s1">fp</span>);
+    <span class="pl-en">initialize_snakes</span>(<span class="pl-s1">state</span>);
+  } <span class="pl-k">else</span> <span class="pl-k">if</span> (<span class="pl-s1">io_stdin</span>) {
+    <span class="pl-s1">state</span> <span class="pl-c1">=</span> <span class="pl-en">load_board</span>(<span class="pl-s1">stdin</span>);
+    <span class="pl-en">initialize_snakes</span>(<span class="pl-s1">state</span>);
+  } <span class="pl-k">else</span> {
+    <span class="pl-en">create_default_state</span>();
+  }
+  <span class="pl-en">update_state</span>(<span class="pl-s1">state</span>, <span class="pl-s1">deterministic_food</span>);
+  <span class="pl-k">if</span> (<span class="pl-s1">out_filename</span> <span class="pl-c1">!=</span> <span class="pl-c1">NULL</span>) {
+    <span class="pl-smi">FILE</span> <span class="pl-c1">*</span><span class="pl-s1">fp</span> <span class="pl-c1">=</span> <span class="pl-en">fopen</span>(<span class="pl-s1">out_filename</span>, <span class="pl-s">"w+"</span>);
+    <span class="pl-en">print_board</span>(<span class="pl-s1">state</span>, <span class="pl-s1">fp</span>);
+  } <span class="pl-k">else</span> {
+    <span class="pl-en">print_board</span>(<span class="pl-s1">state</span>, <span class="pl-s1">stdout</span>);
+  }
+  <span class="pl-en">free_state</span>(<span class="pl-s1">state</span>);
+  <span class="pl-k">return</span> <span class="pl-c1">0</span>;
+}</pre></div></div>
+<div style="font-size:small;margin-top:8px;float:right;">转载请注明出处</div>
+
+<button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
+<div class="comments" id="comments"></div>
+
+</div>
+    <div id="footer"><div id="footer1">Copyright © <span id="copyrightYear"></span> <a href="https://LianSeKong.github.io/lizi">Lizi</a></div>
+<div id="footer2">
+    <span id="runday"></span><span>Powered by <a href="https://meekdai.com/Gmeek.html" target="_blank">Gmeek</a></span>
+</div>
+
+<script>
+var now=new Date();
+document.getElementById("copyrightYear").innerHTML=now.getFullYear();
+
+if(""!=""){
+    var startSite=new Date("");
+    var diff=now.getTime()-startSite.getTime();
+    var diffDay=Math.floor(diff/(1000*60*60*24));
+    document.getElementById("runday").innerHTML="网站运行"+diffDay+"天"+" • ";
+}
+</script></div>
+</body>
+<script>
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z', 'copy': 'M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z', 'check': 'M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'};
+var utterancesLoad=0;
+
+let themeSettings={
+    "dark": ["dark","moon","#00f0ff","dark-blue"],
+    "light": ["light","sun","#ff5000","github-light"],
+    "auto": ["auto","sync","","preferred-color-scheme"]
+};
+function changeTheme(mode, icon, color, utheme){
+    document.documentElement.setAttribute("data-color-mode",mode);
+    document.getElementById("themeSwitch").setAttribute("d",value=IconList[icon]);
+    document.getElementById("themeSwitch").parentNode.style.color=color;
+    if(utterancesLoad==1){utterancesTheme(utheme);}
+}
+function modeSwitch(){
+    let currentMode=document.documentElement.getAttribute('data-color-mode');
+    let newMode = currentMode === "light" ? "dark" : currentMode === "dark" ? "auto" : "light";
+    localStorage.setItem("meek_theme", newMode);
+    if(themeSettings[newMode]){
+        changeTheme(...themeSettings[newMode]);
+    }
+}
+function utterancesTheme(theme){
+    const message={type:'set-theme',theme: theme};
+    const iframe=document.getElementsByClassName('utterances-frame')[0];
+    iframe.contentWindow.postMessage(message,'https://utteranc.es');
+}
+if(themeSettings[theme]){changeTheme(...themeSettings[theme]);}
+console.log("\n %c Gmeek last https://github.com/Meekdai/Gmeek \n","padding:5px 0;background:#02d81d;color:#fff");
+</script>
+
+<script>
+document.getElementById("pathHome").setAttribute("d",IconList["home"]);
+document.getElementById("pathIssue").setAttribute("d",IconList["github"]);
+
+
+
+function openComments(){
+    cm=document.getElementById("comments");
+    cmButton=document.getElementById("cmButton");
+    cmButton.innerHTML="loading";
+    span=document.createElement("span");
+    span.setAttribute("class","AnimatedEllipsis");
+    cmButton.appendChild(span);
+
+    script=document.createElement("script");
+    script.setAttribute("src","https://utteranc.es/client.js");
+    script.setAttribute("repo","LianSeKong/lizi");
+    script.setAttribute("issue-term","title");
+    
+    if(localStorage.getItem("meek_theme")=="dark"){script.setAttribute("theme","dark-blue");}
+    else if(localStorage.getItem("meek_theme")=="light") {script.setAttribute("theme","github-light");}
+    else{script.setAttribute("theme","preferred-color-scheme");}
+    
+    script.setAttribute("crossorigin","anonymous");
+    script.setAttribute("async","");
+    cm.appendChild(script);
+
+    int=self.setInterval("iFrameLoading()",200);
+}
+
+function iFrameLoading(){
+    var utterances=document.getElementsByClassName('utterances');
+    if(utterances.length==1){
+        if(utterances[0].style.height!=""){
+            utterancesLoad=1;
+            int=window.clearInterval(int);
+            document.getElementById("cmButton").style.display="none";
+            console.log("utterances Load OK");
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const createClipboardHTML = (codeContent, additionalClasses = '') => `
+        <pre class="notranslate"><code class="notranslate">${codeContent}</code></pre>
+        <div class="clipboard-container position-absolute right-0 top-0 ${additionalClasses}">
+            <clipboard-copy class="ClipboardButton btn m-2 p-0" role="button" style="display: inherit;">
+                <svg height="16" width="16" class="octicon octicon-copy m-2"><path d="${IconList["copy"]}"></path></svg>
+                <svg height="16" width="16" class="octicon octicon-check color-fg-success m-2 d-none"><path d="${IconList["check"]}"></path></svg>
+            </clipboard-copy>
+            <div class="copy-feedback">Copied!</div>
+        </div>
+    `;
+
+    const handleCodeElements = (selector = '') => {
+        document.querySelectorAll(selector).forEach(codeElement => {
+            const codeContent = codeElement.innerHTML;
+            const newStructure = document.createElement('div');
+            newStructure.className = 'snippet-clipboard-content position-relative overflow-auto';
+            newStructure.innerHTML = createClipboardHTML(codeContent);
+
+            const parentElement = codeElement.parentElement;
+            if (selector.includes('highlight')) {
+                parentElement.insertBefore(newStructure, codeElement.nextSibling);
+                parentElement.removeChild(codeElement);
+            } else {
+                parentElement.parentElement.replaceChild(newStructure, parentElement);
+            }
+        });
+    };
+
+    handleCodeElements('pre.notranslate > code.notranslate');
+    handleCodeElements('div.highlight > pre.notranslate');
+
+    let currentFeedback = null;
+    document.querySelectorAll('clipboard-copy').forEach(copyButton => {
+        copyButton.addEventListener('click', () => {
+            const codeContent = copyButton.closest('.snippet-clipboard-content').innerText;
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = codeContent;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            const copyIcon = copyButton.querySelector('.octicon-copy');
+            const checkIcon = copyButton.querySelector('.octicon-check');
+            const copyFeedback = copyButton.nextElementSibling;
+
+            if (currentFeedback && currentFeedback !== copyFeedback) {currentFeedback.style.display = 'none';}
+            currentFeedback = copyFeedback;
+
+            copyIcon.classList.add('d-none');
+            checkIcon.classList.remove('d-none');
+            copyFeedback.style.display = 'block';
+            copyButton.style.borderColor = 'var(--color-success-fg)';
+
+            setTimeout(() => {
+                copyIcon.classList.remove('d-none');
+                checkIcon.classList.add('d-none');
+                copyFeedback.style.display = 'none';
+                copyButton.style.borderColor = '';
+            }, 2000);
+        });
+    });
+});
+
+</script>
+
+
+</html>
