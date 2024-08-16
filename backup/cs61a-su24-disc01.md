@@ -1,3 +1,4 @@
+``` python
 from math import sqrt
 
 # positive integer: 大于0的整数
@@ -159,3 +160,5 @@ def ordered_digits(x):
             return False
         x //= 10
     return True
+
+```

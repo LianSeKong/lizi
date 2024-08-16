@@ -10,7 +10,8 @@
         let theme = localStorage.getItem("meek_theme") || "light";
         document.documentElement.setAttribute("data-color-mode", theme);
     </script>
-<meta name="description" content="from math import sqrt
+<meta name="description" content="``` python
+from math import sqrt
 
 # positive integer: 大于0的整数
 
@@ -170,9 +171,12 @@ def ordered_digits(x):
         if (x % 10 < x // 10 % 10):
             return False
         x //= 10
-    return True。">
+    return True
+
+```。">
 <meta property="og:title" content="cs61a-su24-disc01">
-<meta property="og:description" content="from math import sqrt
+<meta property="og:description" content="``` python
+from math import sqrt
 
 # positive integer: 大于0的整数
 
@@ -332,12 +336,14 @@ def ordered_digits(x):
         if (x % 10 < x // 10 % 10):
             return False
         x //= 10
-    return True。">
+    return True
+
+```。">
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://LianSeKong.github.io/lizi/post/cs61a-su24-disc01.html">
 <meta property="og:image" content="https://img.icons8.com/doodle/480/mugman.png">
 <title>cs61a-su24-disc01</title>
-
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
 
 
 </head>
@@ -403,148 +409,167 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 </div>
 </div>
     <div id="content">
-<div class="markdown-body" id="postBody"><p>from math import sqrt</p>
-<h1>positive integer: 大于0的整数</h1>
-<p>#Q1: Race<br>
-#The race function below sometimes returns the wrong value and sometimes runs forever.</p>
-<p>def race(x, y):<br>
-"""The tortoise always walks x feet per minute, while the hare repeatedly<br>
-runs y feet per minute for 5 minutes, then rests for 5 minutes. Return how<br>
-many minutes pass until the tortoise first catches up to the hare.</p>
-<pre class="notranslate"><code class="notranslate">&gt;&gt;&gt; race(5, 7)  # After 7 minutes, both have gone 35 steps
-7
-&gt;&gt;&gt; race(2, 4) # After 10 minutes, both have gone 20 steps
-10
-"""
-assert y &gt; x and y &lt;= 2 * x, 'the hare must be fast but not too fast'
-tortoise, hare, minutes = 0, 0, 0
-while minutes == 0 or tortoise - hare:
-    tortoise += x
-    if minutes % 10 &lt; 5:
-        hare += y
-    minutes += 1
-return minutes
-</code></pre>
-<h1>x &lt;= (y - x) * 5 &lt;= 5x</h1>
-<h1>1. 6x&lt;=5y</h1>
-<h1>3. y &lt;= 2x</h1>
-<h1>Example: 9 10</h1>
-<h1>Q2: Fizzbuzz</h1>
-<p>def fizzbuzz(n):<br>
-"""<br>
-&gt;&gt;&gt; result = fizzbuzz(16)<br>
-1<br>
-2<br>
-fizz<br>
-4<br>
-buzz<br>
-fizz<br>
-7<br>
-8<br>
-fizz<br>
-buzz<br>
-11<br>
-fizz<br>
-13<br>
-14<br>
-fizzbuzz<br>
-16<br>
-&gt;&gt;&gt; print(result)<br>
-None<br>
-"""<br>
-"*** YOUR CODE HERE ***"<br>
-i = 1<br>
-while i &lt;= n:<br>
-if i % 15 == 0:<br>
-print("fizzbuzz")<br>
-elif i % 3 == 0:<br>
-print("fizz")<br>
-elif i % 5 == 0:<br>
-print("buzz")<br>
-else:<br>
-print(i)<br>
-i += 1</p>
-<h1>Q3: Is Prime?</h1>
-<p>def is_prime(n):<br>
-"""<br>
-&gt;&gt;&gt; is_prime(10)<br>
-False<br>
-&gt;&gt;&gt; is_prime(7)<br>
-True<br>
-&gt;&gt;&gt; is_prime(1) # one is not a prime number!!<br>
-False<br>
-"""<br>
-# prime number:  A positive integer that is divisible only by 1 and itself<br>
-# 1. determine that n is 1 No<br>
-# 2. iterate from 2 to n<br>
-# 3. if n is divisible by i, False is returned<br>
-# 4. else return True<br>
-assert n &gt; 0, "the n must be larger than 0"<br>
-if n == 1:<br>
-return False<br>
-i = 2<br>
-while i &lt;= sqrt(n):<br>
-if n % i == 0:<br>
-return False<br>
-i += 1<br>
-return True</p>
-<h1>Q4: Unique Digits</h1>
-<h1>Write a function that returns the number of unique digits in a positive integer.</h1>
-<p>def unique_digits(n):<br>
-"""Return the number of unique digits in positive integer n.</p>
-<pre class="notranslate"><code class="notranslate">&gt;&gt;&gt; unique_digits(8675309) # All are unique
-7
-&gt;&gt;&gt; unique_digits(13173131) # 1, 3, and 7
-3
-&gt;&gt;&gt; unique_digits(101) # 0 and 1
-2
-"""
-count, i = 0, 0
-while i &lt;= 9:
-    if (has_digit(n, i)):
-        count += 1
-    i += 1
-return count
-</code></pre>
-<p>def has_digit(n, k):<br>
-"""Returns whether k is a digit in n.</p>
-<pre class="notranslate"><code class="notranslate">&gt;&gt;&gt; has_digit(10, 1)
-True
-&gt;&gt;&gt; has_digit(12, 7)
-False
-"""
-assert k &gt;= 0 and k &lt; 10
-while n &gt; 0:
-    if n % 10 == k:
-        return True 
-    n //= 10
-return False
-</code></pre>
-<h1>Q5: Ordered Digits</h1>
-<p>def ordered_digits(x):<br>
-"""Return True if the (base 10) digits of X&gt;0 are in non-decreasing<br>
-order, and False otherwise.</p>
-<pre class="notranslate"><code class="notranslate">&gt;&gt;&gt; ordered_digits(5)
-True
-&gt;&gt;&gt; ordered_digits(11)
-True
-&gt;&gt;&gt; ordered_digits(127)
-True
-&gt;&gt;&gt; ordered_digits(1357)
-True
-&gt;&gt;&gt; ordered_digits(21)
-False
-&gt;&gt;&gt; result = ordered_digits(1375) # Return, don't print
-&gt;&gt;&gt; result
-False
+<div class="markdown-body" id="postBody"><div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">from</span> <span class="pl-s1">math</span> <span class="pl-k">import</span> <span class="pl-s1">sqrt</span>
 
-"""
-while x &gt;= 10:
-    if (x % 10 &lt; x // 10 % 10):
-        return False
-    x //= 10
-return True
-</code></pre></div>
+<span class="pl-c"># positive integer: 大于0的整数</span>
+
+<span class="pl-c">#Q1: Race</span>
+<span class="pl-c">#The race function below sometimes returns the wrong value and sometimes runs forever.</span>
+
+<span class="pl-k">def</span> <span class="pl-en">race</span>(<span class="pl-s1">x</span>, <span class="pl-s1">y</span>):
+    <span class="pl-s">"""The tortoise always walks x feet per minute, while the hare repeatedly</span>
+<span class="pl-s">    runs y feet per minute for 5 minutes, then rests for 5 minutes. Return how</span>
+<span class="pl-s">    many minutes pass until the tortoise first catches up to the hare.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; race(5, 7)  # After 7 minutes, both have gone 35 steps</span>
+<span class="pl-s">    7</span>
+<span class="pl-s">    &gt;&gt;&gt; race(2, 4) # After 10 minutes, both have gone 20 steps</span>
+<span class="pl-s">    10</span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">assert</span> <span class="pl-s1">y</span> <span class="pl-c1">&gt;</span> <span class="pl-s1">x</span> <span class="pl-c1">and</span> <span class="pl-s1">y</span> <span class="pl-c1">&lt;=</span> <span class="pl-c1">2</span> <span class="pl-c1">*</span> <span class="pl-s1">x</span>, <span class="pl-s">'the hare must be fast but not too fast'</span>
+    <span class="pl-s1">tortoise</span>, <span class="pl-s1">hare</span>, <span class="pl-s1">minutes</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>, <span class="pl-c1">0</span>, <span class="pl-c1">0</span>
+    <span class="pl-k">while</span> <span class="pl-s1">minutes</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span> <span class="pl-c1">or</span> <span class="pl-s1">tortoise</span> <span class="pl-c1">-</span> <span class="pl-s1">hare</span>:
+        <span class="pl-s1">tortoise</span> <span class="pl-c1">+=</span> <span class="pl-s1">x</span>
+        <span class="pl-k">if</span> <span class="pl-s1">minutes</span> <span class="pl-c1">%</span> <span class="pl-c1">10</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">5</span>:
+            <span class="pl-s1">hare</span> <span class="pl-c1">+=</span> <span class="pl-s1">y</span>
+        <span class="pl-s1">minutes</span> <span class="pl-c1">+=</span> <span class="pl-c1">1</span>
+    <span class="pl-k">return</span> <span class="pl-s1">minutes</span>
+
+
+<span class="pl-c"># x &lt;= (y - x) * 5 &lt;= 5x </span>
+<span class="pl-c">#  1. 6x&lt;=5y</span>
+<span class="pl-c">#  3. y &lt;= 2x</span>
+<span class="pl-c"># Example: 9 10</span>
+
+
+<span class="pl-c"># Q2: Fizzbuzz</span>
+
+<span class="pl-k">def</span> <span class="pl-en">fizzbuzz</span>(<span class="pl-s1">n</span>):
+    <span class="pl-s">"""</span>
+<span class="pl-s">    &gt;&gt;&gt; result = fizzbuzz(16)</span>
+<span class="pl-s">    1</span>
+<span class="pl-s">    2</span>
+<span class="pl-s">    fizz</span>
+<span class="pl-s">    4</span>
+<span class="pl-s">    buzz</span>
+<span class="pl-s">    fizz</span>
+<span class="pl-s">    7</span>
+<span class="pl-s">    8</span>
+<span class="pl-s">    fizz</span>
+<span class="pl-s">    buzz</span>
+<span class="pl-s">    11</span>
+<span class="pl-s">    fizz</span>
+<span class="pl-s">    13</span>
+<span class="pl-s">    14</span>
+<span class="pl-s">    fizzbuzz</span>
+<span class="pl-s">    16</span>
+<span class="pl-s">    &gt;&gt;&gt; print(result)</span>
+<span class="pl-s">    None</span>
+<span class="pl-s">    """</span>
+    <span class="pl-s">"*** YOUR CODE HERE ***"</span>
+    <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span>
+    <span class="pl-k">while</span> <span class="pl-s1">i</span> <span class="pl-c1">&lt;=</span> <span class="pl-s1">n</span>:
+        <span class="pl-k">if</span> <span class="pl-s1">i</span> <span class="pl-c1">%</span> <span class="pl-c1">15</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span>:
+            <span class="pl-en">print</span>(<span class="pl-s">"fizzbuzz"</span>)
+        <span class="pl-k">elif</span> <span class="pl-s1">i</span> <span class="pl-c1">%</span> <span class="pl-c1">3</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span>:
+            <span class="pl-en">print</span>(<span class="pl-s">"fizz"</span>)
+        <span class="pl-k">elif</span> <span class="pl-s1">i</span> <span class="pl-c1">%</span> <span class="pl-c1">5</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span>:
+            <span class="pl-en">print</span>(<span class="pl-s">"buzz"</span>)
+        <span class="pl-k">else</span>:
+            <span class="pl-en">print</span>(<span class="pl-s1">i</span>)
+        <span class="pl-s1">i</span> <span class="pl-c1">+=</span> <span class="pl-c1">1</span>
+
+<span class="pl-c"># Q3: Is Prime?</span>
+
+
+<span class="pl-k">def</span> <span class="pl-en">is_prime</span>(<span class="pl-s1">n</span>):
+    <span class="pl-s">"""</span>
+<span class="pl-s">    &gt;&gt;&gt; is_prime(10)</span>
+<span class="pl-s">    False</span>
+<span class="pl-s">    &gt;&gt;&gt; is_prime(7)</span>
+<span class="pl-s">    True</span>
+<span class="pl-s">    &gt;&gt;&gt; is_prime(1) # one is not a prime number!!</span>
+<span class="pl-s">    False</span>
+<span class="pl-s">    """</span>
+    <span class="pl-c"># prime number:  A positive integer that is divisible only by 1 and itself</span>
+    <span class="pl-c"># 1. determine that n is 1 No</span>
+    <span class="pl-c"># 2. iterate from 2 to n</span>
+    <span class="pl-c"># 3. if n is divisible by i, False is returned</span>
+    <span class="pl-c"># 4. else return True</span>
+    <span class="pl-k">assert</span> <span class="pl-s1">n</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">0</span>, <span class="pl-s">"the n must be larger than 0"</span>
+    <span class="pl-k">if</span> <span class="pl-s1">n</span> <span class="pl-c1">==</span> <span class="pl-c1">1</span>:
+        <span class="pl-k">return</span> <span class="pl-c1">False</span>
+    <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">2</span>
+    <span class="pl-k">while</span> <span class="pl-s1">i</span> <span class="pl-c1">&lt;=</span> <span class="pl-en">sqrt</span>(<span class="pl-s1">n</span>):
+        <span class="pl-k">if</span> <span class="pl-s1">n</span> <span class="pl-c1">%</span> <span class="pl-s1">i</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span>:
+            <span class="pl-k">return</span> <span class="pl-c1">False</span>
+        <span class="pl-s1">i</span> <span class="pl-c1">+=</span> <span class="pl-c1">1</span>
+    <span class="pl-k">return</span> <span class="pl-c1">True</span>
+
+
+<span class="pl-c"># Q4: Unique Digits</span>
+<span class="pl-c"># Write a function that returns the number of unique digits in a positive integer.</span>
+
+<span class="pl-k">def</span> <span class="pl-en">unique_digits</span>(<span class="pl-s1">n</span>):
+    <span class="pl-s">"""Return the number of unique digits in positive integer n.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; unique_digits(8675309) # All are unique</span>
+<span class="pl-s">    7</span>
+<span class="pl-s">    &gt;&gt;&gt; unique_digits(13173131) # 1, 3, and 7</span>
+<span class="pl-s">    3</span>
+<span class="pl-s">    &gt;&gt;&gt; unique_digits(101) # 0 and 1</span>
+<span class="pl-s">    2</span>
+<span class="pl-s">    """</span>
+    <span class="pl-s1">count</span>, <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>, <span class="pl-c1">0</span>
+    <span class="pl-k">while</span> <span class="pl-s1">i</span> <span class="pl-c1">&lt;=</span> <span class="pl-c1">9</span>:
+        <span class="pl-k">if</span> (<span class="pl-en">has_digit</span>(<span class="pl-s1">n</span>, <span class="pl-s1">i</span>)):
+            <span class="pl-s1">count</span> <span class="pl-c1">+=</span> <span class="pl-c1">1</span>
+        <span class="pl-s1">i</span> <span class="pl-c1">+=</span> <span class="pl-c1">1</span>
+    <span class="pl-k">return</span> <span class="pl-s1">count</span>
+
+
+<span class="pl-k">def</span> <span class="pl-en">has_digit</span>(<span class="pl-s1">n</span>, <span class="pl-s1">k</span>):
+    <span class="pl-s">"""Returns whether k is a digit in n.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; has_digit(10, 1)</span>
+<span class="pl-s">    True</span>
+<span class="pl-s">    &gt;&gt;&gt; has_digit(12, 7)</span>
+<span class="pl-s">    False</span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">assert</span> <span class="pl-s1">k</span> <span class="pl-c1">&gt;=</span> <span class="pl-c1">0</span> <span class="pl-c1">and</span> <span class="pl-s1">k</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">10</span>
+    <span class="pl-k">while</span> <span class="pl-s1">n</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">0</span>:
+        <span class="pl-k">if</span> <span class="pl-s1">n</span> <span class="pl-c1">%</span> <span class="pl-c1">10</span> <span class="pl-c1">==</span> <span class="pl-s1">k</span>:
+            <span class="pl-k">return</span> <span class="pl-c1">True</span> 
+        <span class="pl-s1">n</span> <span class="pl-c1">//=</span> <span class="pl-c1">10</span>
+    <span class="pl-k">return</span> <span class="pl-c1">False</span>
+
+
+<span class="pl-c"># Q5: Ordered Digits</span>
+
+<span class="pl-k">def</span> <span class="pl-en">ordered_digits</span>(<span class="pl-s1">x</span>):
+    <span class="pl-s">"""Return True if the (base 10) digits of X&gt;0 are in non-decreasing</span>
+<span class="pl-s">    order, and False otherwise.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; ordered_digits(5)</span>
+<span class="pl-s">    True</span>
+<span class="pl-s">    &gt;&gt;&gt; ordered_digits(11)</span>
+<span class="pl-s">    True</span>
+<span class="pl-s">    &gt;&gt;&gt; ordered_digits(127)</span>
+<span class="pl-s">    True</span>
+<span class="pl-s">    &gt;&gt;&gt; ordered_digits(1357)</span>
+<span class="pl-s">    True</span>
+<span class="pl-s">    &gt;&gt;&gt; ordered_digits(21)</span>
+<span class="pl-s">    False</span>
+<span class="pl-s">    &gt;&gt;&gt; result = ordered_digits(1375) # Return, don't print</span>
+<span class="pl-s">    &gt;&gt;&gt; result</span>
+<span class="pl-s">    False</span>
+<span class="pl-s"></span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">while</span> <span class="pl-s1">x</span> <span class="pl-c1">&gt;=</span> <span class="pl-c1">10</span>:
+        <span class="pl-k">if</span> (<span class="pl-s1">x</span> <span class="pl-c1">%</span> <span class="pl-c1">10</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">x</span> <span class="pl-c1">//</span> <span class="pl-c1">10</span> <span class="pl-c1">%</span> <span class="pl-c1">10</span>):
+            <span class="pl-k">return</span> <span class="pl-c1">False</span>
+        <span class="pl-s1">x</span> <span class="pl-c1">//=</span> <span class="pl-c1">10</span>
+    <span class="pl-k">return</span> <span class="pl-c1">True</span></pre></div></div>
 <div style="font-size:small;margin-top:8px;float:right;">转载请注明出处</div>
 
 <button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
