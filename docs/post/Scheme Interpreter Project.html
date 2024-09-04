@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html data-color-mode="light" data-dark-theme="dark" data-light-theme="light" lang="zh-CN">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link href='https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/Primer/21.0.7/primer.css' rel='stylesheet' />
+    
+    <link rel="icon" href="https://img.icons8.com/doodle/480/mugman.png"><script>
+        let theme = localStorage.getItem("meek_theme") || "light";
+        document.documentElement.setAttribute("data-color-mode", theme);
+    </script>
+<meta name="description" content="# Scheme Interpreter 
+
+
+
+> CS61A  Project4 Summer 2024
+
+
+
+## Problem 1 
+
+> Frame类是用于存储当前执行环境中绑定的变量，每个Frame实例具有一个存储变量的字典和父Frame
+
+1. define函数用于存储一个symbol和对应的值
+2. lookup用于寻找Frame中的symbol对应的值（frame链作为一个链表结构，首元素为全局Frame）
+
+
+
+```python
+def define(self, symbol, value):
+    '''Define Scheme SYMBOL to have VALUE.'''
+    # BEGIN PROBLEM 1
+    self.bindings[symbol] = value
+    # END PROBLEM 1
+
+def lookup(self, symbol):
+    '''Return the value bound to SYMBOL. Errors if SYMBOL is not found.'''
+    # BEGIN PROBLEM 1
+    env = self
+    while env is not None:
+        if symbol in env.bindings.keys():
+            return env.bindings[symbol]
+        env = env.parent
+    # END PROBLEM 1
+    raise SchemeError('unknown identifier: {0}'.format(symbol))
+```
+
+
+
+## Problem 2
+
+> scheme中存在内置BuiltinProcedure和LambdaProcedure，MuProcedure三种进程
+
+首先实现内置进程的处理
+
+```python
+ if isinstance(procedure, BuiltinProcedure):
+        # BEGIN PROBLEM 2
+        py_args = []
+        while args is not nil:
+            py_args.append(args.first)
+            args = args.rest
+        if procedure.need_env:
+            py_args.append(env)
+        # END PROBLEM 2
+        try:
+            # BEGIN PROBLEM 2      
+            return procedure.py_func(*py_args)
+
+            # END PROBLEM 2
+        except TypeError as err:
+            raise SchemeError('incorrect number of arguments: {0}'.format(procedure))
+```
+
+
+
+## Problem 3 
+
+>eval一个scheme表达式
+
+Scheme表达式具有三种形式
+
+1.  2
+2. (+ 2 3 4 5 6)
+3. a
+4. (+ (sub expression) (sub expression))
+
+既可以是一个可计算的数字、bool和symbol
+
+也可以是一个可调用的程序
+
+可调用的程序也可以包含可计算的字面量也可以是表达式或者symbol
+
+```python
+def scheme_eval(expr, env, _=None): # Optional third argument is ignored
+    '''Evaluate Scheme expression EXPR in Frame ENV.
+
+    >>> expr = read_line('(+ 2 2)')
+    >>> expr
+    Pair('+', Pair(2, Pair(2, nil)))
+    >>> scheme_eval(expr, create_global_frame())
+    4
+    '''
+    # Evaluate atoms
+    if scheme_symbolp(expr):    # 处理定义的symbol
+        return env.lookup(expr)
+    elif self_evaluating(expr): # 处理数字和布尔值
+        return expr
+
+    # All non-atomic expressions are lists (combinations)
+    if not scheme_listp(expr):  # 处理非法表达式格式
+        raise SchemeError('malformed list: {0}'.format(repl_str(expr)))
+    first, rest = expr.first, expr.rest  
+    # 处理特殊的格式
+    if scheme_symbolp(first) and first in scheme_forms.SPECIAL_FORMS:
+        return scheme_forms.SPECIAL_FORMS[first](rest, env)
+    else:
+        # BEGIN PROBLEM 3
+        if (isinstance(first, Pair)): #处理类似((if #t - +) 2 1)的情况 
+            first = scheme_eval(first, env)
+        elif not isinstance(first, BuiltinProcedure): #处理非内置程序
+            first = env.lookup(first)
+      	# 先执行 operand expression 
+        rest = rest.map(lambda first: scheme_eval(first, env))
+        # 等待 operand expression执行过后，再执行
+        return scheme_apply(first, rest, env)
+
+        # END PROBLEM 3
+
+```
+
+
+
+## Problem 4
+
+> 处理(define x subexpression)情况
+
+```python
+    if scheme_symbolp(signature):
+        # assigning a name to a value e.g. (define x (+ 1 2))
+        validate_form(expressions, 2, 2) 
+        # BEGIN PROBLEM 4
+        env.define(signature, scheme_eval(expressions.rest.first, env))
+        return signature
+        # END PROBLEM 4
+```
+
+
+
+## Problem 5
+
+> 直接返回quote后面的表达式即可，无需计算
+
+```python
+def do_quote_form(expressions, env):
+    '''Evaluate a quote form.
+
+    >>> env = create_global_frame()
+    >>> do_quote_form(read_line('((+ x 2))'), env) # evaluating (quote (+ x 2))
+    Pair('+', Pair('x', Pair(2, nil)))
+    '''
+    validate_form(expressions, 1, 1)
+    # BEGIN PROBLEM 5
+    return expressions.first
+    # END PROBLEM 5
+```
+
+
+
+## Problem 6
+
+
+
+>处理类似于begin这种语句， 计算所有子表达式，返回最后一个表达式的值
+
+```python
+def eval_all(expressions, env):
+    '''Evaluate each expression in the Scheme list EXPRESSIONS in
+    Frame ENV (the current environment) and return the value of the last.
+
+    >>> eval_all(read_line('(1)'), create_global_frame())
+    1
+    >>> eval_all(read_line('(1 2)'), create_global_frame())
+    2
+    >>> x = eval_all(read_line('((print 1) 2)'), create_global_frame())
+    1
+    >>> x
+    2
+    >>> eval_all(read_line('((define x 2) x)'), create_global_frame())
+    2
+    '''
+    # BEGIN PROBLEM 6
+    
+    while not expressions is nil:
+        val = scheme_eval(expressions.first, env)
+        expressions = expressions.rest
+        if expressions is nil:
+            return val
+    # END PROBLEM 6
+```
+
+
+
+## Problem 7 
+
+> 根据内置定义，去创建一个lambda程序的实例
+
+
+
+```python
+def do_lambda_form(expressions, env):
+    '''Evaluate a lambda form.
+
+    >>> env = create_global_frame()
+    >>> do_lambda_form(read_line('((x) (+ x 2))'), env) # evaluating (lambda (x) (+ x 2))
+    LambdaProcedure(Pair('x', nil), Pair(Pair('+', Pair('x', Pair(2, nil))), nil), <Global Frame>)
+    '''
+    validate_form(expressions, 2)
+    formals = expressions.first
+    validate_formals(formals)
+    # BEGIN PROBLEM 7
+    body = expressions.rest
+    return LambdaProcedure(formals, body, env)
+
+    # END PROBLEM 7
+
+```
+
+
+
+## Problem 8
+
+> lambda程序的执行会创建一个局部的frame，根据参数symbol和参数值在局部的frame的bindings中建立映射
+
+
+
+```python
+def make_child_frame(self, formals, vals):
+    '''Return a new local frame whose parent is SELF, in which the symbols
+    in a Scheme list of formal parameters FORMALS are bound to the Scheme
+    values in the Scheme list VALS. Both FORMALS and VALS are represented
+    as Pairs. Raise an error if too many or too few vals are given.
+
+    >>> env = create_global_frame()
+    >>> formals, expressions = read_line('(a b c)'), read_line('(1 2 3)')
+    >>> env.make_child_frame(formals, expressions)
+    <{a: 1, b: 2, c: 3} -> <Global Frame>>
+    '''
+    if len(formals) != len(vals):
+        raise SchemeError('Incorrect number of arguments to function call')
+    # BEGIN PROBLEM 8
+    frame = Frame(self)
+    while not formals is nil:
+        val = vals.first
+        key = formals.first
+        frame.define(key, val)
+        formals = formals.rest
+        vals = vals.rest
+    return frame
+
+    # END PROBLEM 8
+```
+
+
+
+## Problem 9 
+
+
+
+>执行一个lambda程序，首先创建一个局部frame，然后执行lambda的body里的全部表达式
+>
+>此时调用eval_all而不是scheme_eval的原因是: lambda程序的body中会具有多个子表达式，lambda会逐个执行，返回最后一个表达式执行后的结果
+
+
+
+```python
+elif isinstance(procedure, LambdaProcedure):
+    # BEGIN PROBLEM 9
+    frame = procedure.env.make_child_frame(procedure.formals, args)
+    return eval_all(procedure.body, frame)
+    # END PROBLEM 9
+```
+
+
+
+## Problem 10
+
+>之前实现的define定义symbol的情况，现在来处理定义一个procedure的情况 
+>
+>1. 首次提取procedure的symbol、arguments和body
+>2. 验证arguments是否符合规则
+>3. 创建一个lambda表达式
+>4. 向frame的bindings中建立映射
+
+```python
+    elif isinstance(signature, Pair) and scheme_symbolp(signature.first):
+        # defining a named procedure e.g. (define (f x y) (+ x y))
+        # BEGIN PROBLEM 10
+        symbol = signature.first
+        formals = signature.rest
+        body = expressions.rest
+
+        validate_formals(formals)
+
+        val = LambdaProcedure(formals, body, env)
+        env.define(symbol, val)
+        return symbol
+        # END PROBLEM 10
+
+```
+
+
+
+## Problem 11
+
+>do_mu_form： 执行时的父frame不取决于定义procedure的的frame，而取决于执行时的frame
+
+
+
+```python
+def do_mu_form(expressions, env):
+    '''Evaluate a mu form.'''
+    validate_form(expressions, 2)
+    formals = expressions.first
+    validate_formals(formals)
+    # BEGIN PROBLEM 11
+    body = expressions.rest
+    return MuProcedure(formals, body)
+    # END PROBLEM 11
+```
+
+
+
+执行mu程序时，根据当前的frame去创建局部frame
+
+```python
+    elif isinstance(procedure, MuProcedure):
+        # BEGIN PROBLEM 11
+        frame = env.make_child_frame(procedure.formals, args)
+        return eval_all(procedure.body, frame)
+```
+
+
+
+
+
+## Problem 12
+
+> 处理and和if，规则在项目开始文件中已经描述的很清楚了
+
+
+
+```python
+def do_and_form(expressions, env):
+    '''Evaluate a (short-circuited) and form.
+
+    >>> env = create_global_frame()
+    >>> do_and_form(read_line('(#f (print 1))'), env) # evaluating (and #f (print 1))
+    False
+    >>> # evaluating (and (print 1) (print 2) (print 4) 3 #f)
+    >>> do_and_form(read_line('((print 1) (print 2) (print 3) (print 4) 3 #f)'), env)
+    1
+    2
+    3
+    4
+    False
+    '''
+    # BEGIN PROBLEM 12
+    while not expressions is nil:
+        val = scheme_eval(expressions.first, env)
+        if is_scheme_false(val):
+            return False
+        if expressions.rest is nil:
+            return val
+        expressions = expressions.rest
+    return True
+    # END PROBLEM 12
+
+def do_or_form(expressions, env):
+    '''Evaluate a (short-circuited) or form.
+
+    >>> env = create_global_frame()
+    >>> do_or_form(read_line('(10 (print 1))'), env) # evaluating (or 10 (print 1))
+    10
+    >>> do_or_form(read_line('(#f 2 3 #t #f)'), env) # evaluating (or #f 2 3 #t #f)
+    2
+    >>> # evaluating (or (begin (print 1) #f) (begin (print 2) #f) 6 (begin (print 3) 7))
+    >>> do_or_form(read_line('((begin (print 1) #f) (begin (print 2) #f) 6 (begin (print 3) 7))'), env)
+    1
+    2
+    6
+    '''
+    # BEGIN PROBLEM 12
+    while not expressions is nil:
+        val = scheme_eval(expressions.first, env)
+        if is_scheme_true(val):
+            return val
+        expressions = expressions.rest
+    return False
+    # END PROBLEM 12
+```
+
+
+
+## Problem 13 
+
+> do_cond_form:  具有多个子表达式（包含else）,如果是else则直接返回表达式执行的结果。">
+<meta property="og:title" content="Scheme Interpreter Project">
+<meta property="og:description" content="# Scheme Interpreter 
+
+
+
+> CS61A  Project4 Summer 2024
+
+
+
+## Problem 1 
+
+> Frame类是用于存储当前执行环境中绑定的变量，每个Frame实例具有一个存储变量的字典和父Frame
+
+1. define函数用于存储一个symbol和对应的值
+2. lookup用于寻找Frame中的symbol对应的值（frame链作为一个链表结构，首元素为全局Frame）
+
+
+
+```python
+def define(self, symbol, value):
+    '''Define Scheme SYMBOL to have VALUE.'''
+    # BEGIN PROBLEM 1
+    self.bindings[symbol] = value
+    # END PROBLEM 1
+
+def lookup(self, symbol):
+    '''Return the value bound to SYMBOL. Errors if SYMBOL is not found.'''
+    # BEGIN PROBLEM 1
+    env = self
+    while env is not None:
+        if symbol in env.bindings.keys():
+            return env.bindings[symbol]
+        env = env.parent
+    # END PROBLEM 1
+    raise SchemeError('unknown identifier: {0}'.format(symbol))
+```
+
+
+
+## Problem 2
+
+> scheme中存在内置BuiltinProcedure和LambdaProcedure，MuProcedure三种进程
+
+首先实现内置进程的处理
+
+```python
+ if isinstance(procedure, BuiltinProcedure):
+        # BEGIN PROBLEM 2
+        py_args = []
+        while args is not nil:
+            py_args.append(args.first)
+            args = args.rest
+        if procedure.need_env:
+            py_args.append(env)
+        # END PROBLEM 2
+        try:
+            # BEGIN PROBLEM 2      
+            return procedure.py_func(*py_args)
+
+            # END PROBLEM 2
+        except TypeError as err:
+            raise SchemeError('incorrect number of arguments: {0}'.format(procedure))
+```
+
+
+
+## Problem 3 
+
+>eval一个scheme表达式
+
+Scheme表达式具有三种形式
+
+1.  2
+2. (+ 2 3 4 5 6)
+3. a
+4. (+ (sub expression) (sub expression))
+
+既可以是一个可计算的数字、bool和symbol
+
+也可以是一个可调用的程序
+
+可调用的程序也可以包含可计算的字面量也可以是表达式或者symbol
+
+```python
+def scheme_eval(expr, env, _=None): # Optional third argument is ignored
+    '''Evaluate Scheme expression EXPR in Frame ENV.
+
+    >>> expr = read_line('(+ 2 2)')
+    >>> expr
+    Pair('+', Pair(2, Pair(2, nil)))
+    >>> scheme_eval(expr, create_global_frame())
+    4
+    '''
+    # Evaluate atoms
+    if scheme_symbolp(expr):    # 处理定义的symbol
+        return env.lookup(expr)
+    elif self_evaluating(expr): # 处理数字和布尔值
+        return expr
+
+    # All non-atomic expressions are lists (combinations)
+    if not scheme_listp(expr):  # 处理非法表达式格式
+        raise SchemeError('malformed list: {0}'.format(repl_str(expr)))
+    first, rest = expr.first, expr.rest  
+    # 处理特殊的格式
+    if scheme_symbolp(first) and first in scheme_forms.SPECIAL_FORMS:
+        return scheme_forms.SPECIAL_FORMS[first](rest, env)
+    else:
+        # BEGIN PROBLEM 3
+        if (isinstance(first, Pair)): #处理类似((if #t - +) 2 1)的情况 
+            first = scheme_eval(first, env)
+        elif not isinstance(first, BuiltinProcedure): #处理非内置程序
+            first = env.lookup(first)
+      	# 先执行 operand expression 
+        rest = rest.map(lambda first: scheme_eval(first, env))
+        # 等待 operand expression执行过后，再执行
+        return scheme_apply(first, rest, env)
+
+        # END PROBLEM 3
+
+```
+
+
+
+## Problem 4
+
+> 处理(define x subexpression)情况
+
+```python
+    if scheme_symbolp(signature):
+        # assigning a name to a value e.g. (define x (+ 1 2))
+        validate_form(expressions, 2, 2) 
+        # BEGIN PROBLEM 4
+        env.define(signature, scheme_eval(expressions.rest.first, env))
+        return signature
+        # END PROBLEM 4
+```
+
+
+
+## Problem 5
+
+> 直接返回quote后面的表达式即可，无需计算
+
+```python
+def do_quote_form(expressions, env):
+    '''Evaluate a quote form.
+
+    >>> env = create_global_frame()
+    >>> do_quote_form(read_line('((+ x 2))'), env) # evaluating (quote (+ x 2))
+    Pair('+', Pair('x', Pair(2, nil)))
+    '''
+    validate_form(expressions, 1, 1)
+    # BEGIN PROBLEM 5
+    return expressions.first
+    # END PROBLEM 5
+```
+
+
+
+## Problem 6
+
+
+
+>处理类似于begin这种语句， 计算所有子表达式，返回最后一个表达式的值
+
+```python
+def eval_all(expressions, env):
+    '''Evaluate each expression in the Scheme list EXPRESSIONS in
+    Frame ENV (the current environment) and return the value of the last.
+
+    >>> eval_all(read_line('(1)'), create_global_frame())
+    1
+    >>> eval_all(read_line('(1 2)'), create_global_frame())
+    2
+    >>> x = eval_all(read_line('((print 1) 2)'), create_global_frame())
+    1
+    >>> x
+    2
+    >>> eval_all(read_line('((define x 2) x)'), create_global_frame())
+    2
+    '''
+    # BEGIN PROBLEM 6
+    
+    while not expressions is nil:
+        val = scheme_eval(expressions.first, env)
+        expressions = expressions.rest
+        if expressions is nil:
+            return val
+    # END PROBLEM 6
+```
+
+
+
+## Problem 7 
+
+> 根据内置定义，去创建一个lambda程序的实例
+
+
+
+```python
+def do_lambda_form(expressions, env):
+    '''Evaluate a lambda form.
+
+    >>> env = create_global_frame()
+    >>> do_lambda_form(read_line('((x) (+ x 2))'), env) # evaluating (lambda (x) (+ x 2))
+    LambdaProcedure(Pair('x', nil), Pair(Pair('+', Pair('x', Pair(2, nil))), nil), <Global Frame>)
+    '''
+    validate_form(expressions, 2)
+    formals = expressions.first
+    validate_formals(formals)
+    # BEGIN PROBLEM 7
+    body = expressions.rest
+    return LambdaProcedure(formals, body, env)
+
+    # END PROBLEM 7
+
+```
+
+
+
+## Problem 8
+
+> lambda程序的执行会创建一个局部的frame，根据参数symbol和参数值在局部的frame的bindings中建立映射
+
+
+
+```python
+def make_child_frame(self, formals, vals):
+    '''Return a new local frame whose parent is SELF, in which the symbols
+    in a Scheme list of formal parameters FORMALS are bound to the Scheme
+    values in the Scheme list VALS. Both FORMALS and VALS are represented
+    as Pairs. Raise an error if too many or too few vals are given.
+
+    >>> env = create_global_frame()
+    >>> formals, expressions = read_line('(a b c)'), read_line('(1 2 3)')
+    >>> env.make_child_frame(formals, expressions)
+    <{a: 1, b: 2, c: 3} -> <Global Frame>>
+    '''
+    if len(formals) != len(vals):
+        raise SchemeError('Incorrect number of arguments to function call')
+    # BEGIN PROBLEM 8
+    frame = Frame(self)
+    while not formals is nil:
+        val = vals.first
+        key = formals.first
+        frame.define(key, val)
+        formals = formals.rest
+        vals = vals.rest
+    return frame
+
+    # END PROBLEM 8
+```
+
+
+
+## Problem 9 
+
+
+
+>执行一个lambda程序，首先创建一个局部frame，然后执行lambda的body里的全部表达式
+>
+>此时调用eval_all而不是scheme_eval的原因是: lambda程序的body中会具有多个子表达式，lambda会逐个执行，返回最后一个表达式执行后的结果
+
+
+
+```python
+elif isinstance(procedure, LambdaProcedure):
+    # BEGIN PROBLEM 9
+    frame = procedure.env.make_child_frame(procedure.formals, args)
+    return eval_all(procedure.body, frame)
+    # END PROBLEM 9
+```
+
+
+
+## Problem 10
+
+>之前实现的define定义symbol的情况，现在来处理定义一个procedure的情况 
+>
+>1. 首次提取procedure的symbol、arguments和body
+>2. 验证arguments是否符合规则
+>3. 创建一个lambda表达式
+>4. 向frame的bindings中建立映射
+
+```python
+    elif isinstance(signature, Pair) and scheme_symbolp(signature.first):
+        # defining a named procedure e.g. (define (f x y) (+ x y))
+        # BEGIN PROBLEM 10
+        symbol = signature.first
+        formals = signature.rest
+        body = expressions.rest
+
+        validate_formals(formals)
+
+        val = LambdaProcedure(formals, body, env)
+        env.define(symbol, val)
+        return symbol
+        # END PROBLEM 10
+
+```
+
+
+
+## Problem 11
+
+>do_mu_form： 执行时的父frame不取决于定义procedure的的frame，而取决于执行时的frame
+
+
+
+```python
+def do_mu_form(expressions, env):
+    '''Evaluate a mu form.'''
+    validate_form(expressions, 2)
+    formals = expressions.first
+    validate_formals(formals)
+    # BEGIN PROBLEM 11
+    body = expressions.rest
+    return MuProcedure(formals, body)
+    # END PROBLEM 11
+```
+
+
+
+执行mu程序时，根据当前的frame去创建局部frame
+
+```python
+    elif isinstance(procedure, MuProcedure):
+        # BEGIN PROBLEM 11
+        frame = env.make_child_frame(procedure.formals, args)
+        return eval_all(procedure.body, frame)
+```
+
+
+
+
+
+## Problem 12
+
+> 处理and和if，规则在项目开始文件中已经描述的很清楚了
+
+
+
+```python
+def do_and_form(expressions, env):
+    '''Evaluate a (short-circuited) and form.
+
+    >>> env = create_global_frame()
+    >>> do_and_form(read_line('(#f (print 1))'), env) # evaluating (and #f (print 1))
+    False
+    >>> # evaluating (and (print 1) (print 2) (print 4) 3 #f)
+    >>> do_and_form(read_line('((print 1) (print 2) (print 3) (print 4) 3 #f)'), env)
+    1
+    2
+    3
+    4
+    False
+    '''
+    # BEGIN PROBLEM 12
+    while not expressions is nil:
+        val = scheme_eval(expressions.first, env)
+        if is_scheme_false(val):
+            return False
+        if expressions.rest is nil:
+            return val
+        expressions = expressions.rest
+    return True
+    # END PROBLEM 12
+
+def do_or_form(expressions, env):
+    '''Evaluate a (short-circuited) or form.
+
+    >>> env = create_global_frame()
+    >>> do_or_form(read_line('(10 (print 1))'), env) # evaluating (or 10 (print 1))
+    10
+    >>> do_or_form(read_line('(#f 2 3 #t #f)'), env) # evaluating (or #f 2 3 #t #f)
+    2
+    >>> # evaluating (or (begin (print 1) #f) (begin (print 2) #f) 6 (begin (print 3) 7))
+    >>> do_or_form(read_line('((begin (print 1) #f) (begin (print 2) #f) 6 (begin (print 3) 7))'), env)
+    1
+    2
+    6
+    '''
+    # BEGIN PROBLEM 12
+    while not expressions is nil:
+        val = scheme_eval(expressions.first, env)
+        if is_scheme_true(val):
+            return val
+        expressions = expressions.rest
+    return False
+    # END PROBLEM 12
+```
+
+
+
+## Problem 13 
+
+> do_cond_form:  具有多个子表达式（包含else）,如果是else则直接返回表达式执行的结果。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://LianSeKong.github.io/lizi/post/Scheme%20Interpreter%20Project.html">
+<meta property="og:image" content="https://img.icons8.com/doodle/480/mugman.png">
+<title>Scheme Interpreter Project</title>
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
+
+
+</head>
+<style>
+body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;padding: 45px;font-size: 16px;font-family: sans-serif;line-height: 1.25;}
+#header{display:flex;padding-bottom:8px;border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted));margin-bottom: 16px;}
+#footer {margin-top:64px; text-align: center;font-size: small;}
+
+</style>
+
+<style>
+.postTitle{margin: auto 0;font-size:40px;font-weight:bold;}
+.title-right{display:flex;margin:auto 0 0 auto;}
+.title-right .circle{padding: 14px 16px;margin-right:8px;}
+#postBody{border-bottom: 1px solid var(--color-border-default);padding-bottom:36px;}
+#postBody hr{height:2px;}
+#cmButton{height:48px;margin-top:48px;}
+#comments{margin-top:64px;}
+.g-emoji{font-size:24px;}
+@media (max-width: 600px) {
+    body {padding: 8px;}
+    .postTitle{font-size:24px;}
+}
+.copy-feedback {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 50px;
+    color: var(--color-fg-on-emphasis);
+    background-color: var(--color-fg-muted);
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
+</style>
+
+
+
+
+<body>
+    <div id="header">
+<h1 class="postTitle">Scheme Interpreter Project</h1>
+<div class="title-right">
+    <a href="https://LianSeKong.github.io/lizi" id="buttonHome" class="btn btn-invisible circle" title="首页">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathHome" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+    <a href="https://github.com/LianSeKong/lizi/issues/15" target="_blank" class="btn btn-invisible circle" title="Issue">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathIssue" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+
+    <a class="btn btn-invisible circle" onclick="modeSwitch();" title="切换主题">
+        <svg class="octicon" width="16" height="16" >
+            <path id="themeSwitch" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+
+</div>
+</div>
+    <div id="content">
+<div class="markdown-body" id="postBody"><h1>Scheme Interpreter</h1>
+<blockquote>
+<p>CS61A  Project4 Summer 2024</p>
+</blockquote>
+<h2>Problem 1</h2>
+<blockquote>
+<p>Frame类是用于存储当前执行环境中绑定的变量，每个Frame实例具有一个存储变量的字典和父Frame</p>
+</blockquote>
+<ol>
+<li>define函数用于存储一个symbol和对应的值</li>
+<li>lookup用于寻找Frame中的symbol对应的值（frame链作为一个链表结构，首元素为全局Frame）</li>
+</ol>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">define</span>(<span class="pl-s1">self</span>, <span class="pl-s1">symbol</span>, <span class="pl-s1">value</span>):
+    <span class="pl-s">"""Define Scheme SYMBOL to have VALUE."""</span>
+    <span class="pl-c"># BEGIN PROBLEM 1</span>
+    <span class="pl-s1">self</span>.<span class="pl-s1">bindings</span>[<span class="pl-s1">symbol</span>] <span class="pl-c1">=</span> <span class="pl-s1">value</span>
+    <span class="pl-c"># END PROBLEM 1</span>
+
+<span class="pl-k">def</span> <span class="pl-en">lookup</span>(<span class="pl-s1">self</span>, <span class="pl-s1">symbol</span>):
+    <span class="pl-s">"""Return the value bound to SYMBOL. Errors if SYMBOL is not found."""</span>
+    <span class="pl-c"># BEGIN PROBLEM 1</span>
+    <span class="pl-s1">env</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>
+    <span class="pl-k">while</span> <span class="pl-s1">env</span> <span class="pl-c1">is</span> <span class="pl-c1">not</span> <span class="pl-c1">None</span>:
+        <span class="pl-k">if</span> <span class="pl-s1">symbol</span> <span class="pl-c1">in</span> <span class="pl-s1">env</span>.<span class="pl-s1">bindings</span>.<span class="pl-en">keys</span>():
+            <span class="pl-k">return</span> <span class="pl-s1">env</span>.<span class="pl-s1">bindings</span>[<span class="pl-s1">symbol</span>]
+        <span class="pl-s1">env</span> <span class="pl-c1">=</span> <span class="pl-s1">env</span>.<span class="pl-s1">parent</span>
+    <span class="pl-c"># END PROBLEM 1</span>
+    <span class="pl-k">raise</span> <span class="pl-v">SchemeError</span>(<span class="pl-s">'unknown identifier: {0}'</span>.<span class="pl-en">format</span>(<span class="pl-s1">symbol</span>))</pre></div>
+<h2>Problem 2</h2>
+<blockquote>
+<p>scheme中存在内置BuiltinProcedure和LambdaProcedure，MuProcedure三种进程</p>
+</blockquote>
+<p>首先实现内置进程的处理</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"> <span class="pl-k">if</span> <span class="pl-en">isinstance</span>(<span class="pl-s1">procedure</span>, <span class="pl-v">BuiltinProcedure</span>):
+        <span class="pl-c"># BEGIN PROBLEM 2</span>
+        <span class="pl-s1">py_args</span> <span class="pl-c1">=</span> []
+        <span class="pl-k">while</span> <span class="pl-s1">args</span> <span class="pl-c1">is</span> <span class="pl-c1">not</span> <span class="pl-s1">nil</span>:
+            <span class="pl-s1">py_args</span>.<span class="pl-en">append</span>(<span class="pl-s1">args</span>.<span class="pl-s1">first</span>)
+            <span class="pl-s1">args</span> <span class="pl-c1">=</span> <span class="pl-s1">args</span>.<span class="pl-s1">rest</span>
+        <span class="pl-k">if</span> <span class="pl-s1">procedure</span>.<span class="pl-s1">need_env</span>:
+            <span class="pl-s1">py_args</span>.<span class="pl-en">append</span>(<span class="pl-s1">env</span>)
+        <span class="pl-c"># END PROBLEM 2</span>
+        <span class="pl-k">try</span>:
+            <span class="pl-c"># BEGIN PROBLEM 2      </span>
+            <span class="pl-k">return</span> <span class="pl-s1">procedure</span>.<span class="pl-en">py_func</span>(<span class="pl-c1">*</span><span class="pl-s1">py_args</span>)
+
+            <span class="pl-c"># END PROBLEM 2</span>
+        <span class="pl-k">except</span> <span class="pl-v">TypeError</span> <span class="pl-k">as</span> <span class="pl-s1">err</span>:
+            <span class="pl-k">raise</span> <span class="pl-v">SchemeError</span>(<span class="pl-s">'incorrect number of arguments: {0}'</span>.<span class="pl-en">format</span>(<span class="pl-s1">procedure</span>))</pre></div>
+<h2>Problem 3</h2>
+<blockquote>
+<p>eval一个scheme表达式</p>
+</blockquote>
+<p>Scheme表达式具有三种形式</p>
+<ol>
+<li>2</li>
+<li>(+ 2 3 4 5 6)</li>
+<li>a</li>
+<li>(+ (sub expression) (sub expression))</li>
+</ol>
+<p>既可以是一个可计算的数字、bool和symbol</p>
+<p>也可以是一个可调用的程序</p>
+<p>可调用的程序也可以包含可计算的字面量也可以是表达式或者symbol</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">scheme_eval</span>(<span class="pl-s1">expr</span>, <span class="pl-s1">env</span>, <span class="pl-s1">_</span><span class="pl-c1">=</span><span class="pl-c1">None</span>): <span class="pl-c"># Optional third argument is ignored</span>
+    <span class="pl-s">"""Evaluate Scheme expression EXPR in Frame ENV.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; expr = read_line('(+ 2 2)')</span>
+<span class="pl-s">    &gt;&gt;&gt; expr</span>
+<span class="pl-s">    Pair('+', Pair(2, Pair(2, nil)))</span>
+<span class="pl-s">    &gt;&gt;&gt; scheme_eval(expr, create_global_frame())</span>
+<span class="pl-s">    4</span>
+<span class="pl-s">    """</span>
+    <span class="pl-c"># Evaluate atoms</span>
+    <span class="pl-k">if</span> <span class="pl-en">scheme_symbolp</span>(<span class="pl-s1">expr</span>):    <span class="pl-c"># 处理定义的symbol</span>
+        <span class="pl-k">return</span> <span class="pl-s1">env</span>.<span class="pl-en">lookup</span>(<span class="pl-s1">expr</span>)
+    <span class="pl-k">elif</span> <span class="pl-en">self_evaluating</span>(<span class="pl-s1">expr</span>): <span class="pl-c"># 处理数字和布尔值</span>
+        <span class="pl-k">return</span> <span class="pl-s1">expr</span>
+
+    <span class="pl-c"># All non-atomic expressions are lists (combinations)</span>
+    <span class="pl-k">if</span> <span class="pl-c1">not</span> <span class="pl-en">scheme_listp</span>(<span class="pl-s1">expr</span>):  <span class="pl-c"># 处理非法表达式格式</span>
+        <span class="pl-k">raise</span> <span class="pl-v">SchemeError</span>(<span class="pl-s">'malformed list: {0}'</span>.<span class="pl-en">format</span>(<span class="pl-en">repl_str</span>(<span class="pl-s1">expr</span>)))
+    <span class="pl-s1">first</span>, <span class="pl-s1">rest</span> <span class="pl-c1">=</span> <span class="pl-s1">expr</span>.<span class="pl-s1">first</span>, <span class="pl-s1">expr</span>.<span class="pl-s1">rest</span>  
+    <span class="pl-c"># 处理特殊的格式</span>
+    <span class="pl-k">if</span> <span class="pl-en">scheme_symbolp</span>(<span class="pl-s1">first</span>) <span class="pl-c1">and</span> <span class="pl-s1">first</span> <span class="pl-c1">in</span> <span class="pl-s1">scheme_forms</span>.<span class="pl-v">SPECIAL_FORMS</span>:
+        <span class="pl-k">return</span> <span class="pl-s1">scheme_forms</span>.<span class="pl-v">SPECIAL_FORMS</span>[<span class="pl-s1">first</span>](<span class="pl-s1">rest</span>, <span class="pl-s1">env</span>)
+    <span class="pl-k">else</span>:
+        <span class="pl-c"># BEGIN PROBLEM 3</span>
+        <span class="pl-k">if</span> (<span class="pl-en">isinstance</span>(<span class="pl-s1">first</span>, <span class="pl-v">Pair</span>)): <span class="pl-c">#处理类似((if #t - +) 2 1)的情况 </span>
+            <span class="pl-s1">first</span> <span class="pl-c1">=</span> <span class="pl-en">scheme_eval</span>(<span class="pl-s1">first</span>, <span class="pl-s1">env</span>)
+        <span class="pl-k">elif</span> <span class="pl-c1">not</span> <span class="pl-en">isinstance</span>(<span class="pl-s1">first</span>, <span class="pl-v">BuiltinProcedure</span>): <span class="pl-c">#处理非内置程序</span>
+            <span class="pl-s1">first</span> <span class="pl-c1">=</span> <span class="pl-s1">env</span>.<span class="pl-en">lookup</span>(<span class="pl-s1">first</span>)
+      	<span class="pl-c"># 先执行 operand expression </span>
+        <span class="pl-s1">rest</span> <span class="pl-c1">=</span> <span class="pl-s1">rest</span>.<span class="pl-en">map</span>(<span class="pl-k">lambda</span> <span class="pl-s1">first</span>: <span class="pl-en">scheme_eval</span>(<span class="pl-s1">first</span>, <span class="pl-s1">env</span>))
+        <span class="pl-c"># 等待 operand expression执行过后，再执行</span>
+        <span class="pl-k">return</span> <span class="pl-en">scheme_apply</span>(<span class="pl-s1">first</span>, <span class="pl-s1">rest</span>, <span class="pl-s1">env</span>)
+
+        <span class="pl-c"># END PROBLEM 3</span></pre></div>
+<h2>Problem 4</h2>
+<blockquote>
+<p>处理(define x subexpression)情况</p>
+</blockquote>
+<div class="highlight highlight-source-python"><pre class="notranslate">    <span class="pl-k">if</span> <span class="pl-en">scheme_symbolp</span>(<span class="pl-s1">signature</span>):
+        <span class="pl-c"># assigning a name to a value e.g. (define x (+ 1 2))</span>
+        <span class="pl-en">validate_form</span>(<span class="pl-s1">expressions</span>, <span class="pl-c1">2</span>, <span class="pl-c1">2</span>) 
+        <span class="pl-c"># BEGIN PROBLEM 4</span>
+        <span class="pl-s1">env</span>.<span class="pl-en">define</span>(<span class="pl-s1">signature</span>, <span class="pl-en">scheme_eval</span>(<span class="pl-s1">expressions</span>.<span class="pl-s1">rest</span>.<span class="pl-s1">first</span>, <span class="pl-s1">env</span>))
+        <span class="pl-k">return</span> <span class="pl-s1">signature</span>
+        <span class="pl-c"># END PROBLEM 4</span></pre></div>
+<h2>Problem 5</h2>
+<blockquote>
+<p>直接返回quote后面的表达式即可，无需计算</p>
+</blockquote>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">do_quote_form</span>(<span class="pl-s1">expressions</span>, <span class="pl-s1">env</span>):
+    <span class="pl-s">"""Evaluate a quote form.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; env = create_global_frame()</span>
+<span class="pl-s">    &gt;&gt;&gt; do_quote_form(read_line("((+ x 2))"), env) # evaluating (quote (+ x 2))</span>
+<span class="pl-s">    Pair('+', Pair('x', Pair(2, nil)))</span>
+<span class="pl-s">    """</span>
+    <span class="pl-en">validate_form</span>(<span class="pl-s1">expressions</span>, <span class="pl-c1">1</span>, <span class="pl-c1">1</span>)
+    <span class="pl-c"># BEGIN PROBLEM 5</span>
+    <span class="pl-k">return</span> <span class="pl-s1">expressions</span>.<span class="pl-s1">first</span>
+    <span class="pl-c"># END PROBLEM 5</span></pre></div>
+<h2>Problem 6</h2>
+<blockquote>
+<p>处理类似于begin这种语句， 计算所有子表达式，返回最后一个表达式的值</p>
+</blockquote>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">eval_all</span>(<span class="pl-s1">expressions</span>, <span class="pl-s1">env</span>):
+    <span class="pl-s">"""Evaluate each expression in the Scheme list EXPRESSIONS in</span>
+<span class="pl-s">    Frame ENV (the current environment) and return the value of the last.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; eval_all(read_line("(1)"), create_global_frame())</span>
+<span class="pl-s">    1</span>
+<span class="pl-s">    &gt;&gt;&gt; eval_all(read_line("(1 2)"), create_global_frame())</span>
+<span class="pl-s">    2</span>
+<span class="pl-s">    &gt;&gt;&gt; x = eval_all(read_line("((print 1) 2)"), create_global_frame())</span>
+<span class="pl-s">    1</span>
+<span class="pl-s">    &gt;&gt;&gt; x</span>
+<span class="pl-s">    2</span>
+<span class="pl-s">    &gt;&gt;&gt; eval_all(read_line("((define x 2) x)"), create_global_frame())</span>
+<span class="pl-s">    2</span>
+<span class="pl-s">    """</span>
+    <span class="pl-c"># BEGIN PROBLEM 6</span>
+    
+    <span class="pl-k">while</span> <span class="pl-c1">not</span> <span class="pl-s1">expressions</span> <span class="pl-c1">is</span> <span class="pl-s1">nil</span>:
+        <span class="pl-s1">val</span> <span class="pl-c1">=</span> <span class="pl-en">scheme_eval</span>(<span class="pl-s1">expressions</span>.<span class="pl-s1">first</span>, <span class="pl-s1">env</span>)
+        <span class="pl-s1">expressions</span> <span class="pl-c1">=</span> <span class="pl-s1">expressions</span>.<span class="pl-s1">rest</span>
+        <span class="pl-k">if</span> <span class="pl-s1">expressions</span> <span class="pl-c1">is</span> <span class="pl-s1">nil</span>:
+            <span class="pl-k">return</span> <span class="pl-s1">val</span>
+    <span class="pl-c"># END PROBLEM 6</span></pre></div>
+<h2>Problem 7</h2>
+<blockquote>
+<p>根据内置定义，去创建一个lambda程序的实例</p>
+</blockquote>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">do_lambda_form</span>(<span class="pl-s1">expressions</span>, <span class="pl-s1">env</span>):
+    <span class="pl-s">"""Evaluate a lambda form.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; env = create_global_frame()</span>
+<span class="pl-s">    &gt;&gt;&gt; do_lambda_form(read_line("((x) (+ x 2))"), env) # evaluating (lambda (x) (+ x 2))</span>
+<span class="pl-s">    LambdaProcedure(Pair('x', nil), Pair(Pair('+', Pair('x', Pair(2, nil))), nil), &lt;Global Frame&gt;)</span>
+<span class="pl-s">    """</span>
+    <span class="pl-en">validate_form</span>(<span class="pl-s1">expressions</span>, <span class="pl-c1">2</span>)
+    <span class="pl-s1">formals</span> <span class="pl-c1">=</span> <span class="pl-s1">expressions</span>.<span class="pl-s1">first</span>
+    <span class="pl-en">validate_formals</span>(<span class="pl-s1">formals</span>)
+    <span class="pl-c"># BEGIN PROBLEM 7</span>
+    <span class="pl-s1">body</span> <span class="pl-c1">=</span> <span class="pl-s1">expressions</span>.<span class="pl-s1">rest</span>
+    <span class="pl-k">return</span> <span class="pl-v">LambdaProcedure</span>(<span class="pl-s1">formals</span>, <span class="pl-s1">body</span>, <span class="pl-s1">env</span>)
+
+    <span class="pl-c"># END PROBLEM 7</span></pre></div>
+<h2>Problem 8</h2>
+<blockquote>
+<p>lambda程序的执行会创建一个局部的frame，根据参数symbol和参数值在局部的frame的bindings中建立映射</p>
+</blockquote>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">make_child_frame</span>(<span class="pl-s1">self</span>, <span class="pl-s1">formals</span>, <span class="pl-s1">vals</span>):
+    <span class="pl-s">"""Return a new local frame whose parent is SELF, in which the symbols</span>
+<span class="pl-s">    in a Scheme list of formal parameters FORMALS are bound to the Scheme</span>
+<span class="pl-s">    values in the Scheme list VALS. Both FORMALS and VALS are represented</span>
+<span class="pl-s">    as Pairs. Raise an error if too many or too few vals are given.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; env = create_global_frame()</span>
+<span class="pl-s">    &gt;&gt;&gt; formals, expressions = read_line('(a b c)'), read_line('(1 2 3)')</span>
+<span class="pl-s">    &gt;&gt;&gt; env.make_child_frame(formals, expressions)</span>
+<span class="pl-s">    &lt;{a: 1, b: 2, c: 3} -&gt; &lt;Global Frame&gt;&gt;</span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">if</span> <span class="pl-en">len</span>(<span class="pl-s1">formals</span>) <span class="pl-c1">!=</span> <span class="pl-en">len</span>(<span class="pl-s1">vals</span>):
+        <span class="pl-k">raise</span> <span class="pl-v">SchemeError</span>(<span class="pl-s">'Incorrect number of arguments to function call'</span>)
+    <span class="pl-c"># BEGIN PROBLEM 8</span>
+    <span class="pl-s1">frame</span> <span class="pl-c1">=</span> <span class="pl-v">Frame</span>(<span class="pl-s1">self</span>)
+    <span class="pl-k">while</span> <span class="pl-c1">not</span> <span class="pl-s1">formals</span> <span class="pl-c1">is</span> <span class="pl-s1">nil</span>:
+        <span class="pl-s1">val</span> <span class="pl-c1">=</span> <span class="pl-s1">vals</span>.<span class="pl-s1">first</span>
+        <span class="pl-s1">key</span> <span class="pl-c1">=</span> <span class="pl-s1">formals</span>.<span class="pl-s1">first</span>
+        <span class="pl-s1">frame</span>.<span class="pl-en">define</span>(<span class="pl-s1">key</span>, <span class="pl-s1">val</span>)
+        <span class="pl-s1">formals</span> <span class="pl-c1">=</span> <span class="pl-s1">formals</span>.<span class="pl-s1">rest</span>
+        <span class="pl-s1">vals</span> <span class="pl-c1">=</span> <span class="pl-s1">vals</span>.<span class="pl-s1">rest</span>
+    <span class="pl-k">return</span> <span class="pl-s1">frame</span>
+
+    <span class="pl-c"># END PROBLEM 8</span></pre></div>
+<h2>Problem 9</h2>
+<blockquote>
+<p>执行一个lambda程序，首先创建一个局部frame，然后执行lambda的body里的全部表达式</p>
+<p>此时调用eval_all而不是scheme_eval的原因是: lambda程序的body中会具有多个子表达式，lambda会逐个执行，返回最后一个表达式执行后的结果</p>
+</blockquote>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">elif</span> <span class="pl-en">isinstance</span>(<span class="pl-s1">procedure</span>, <span class="pl-v">LambdaProcedure</span>):
+    <span class="pl-c"># BEGIN PROBLEM 9</span>
+    <span class="pl-s1">frame</span> <span class="pl-c1">=</span> <span class="pl-s1">procedure</span>.<span class="pl-s1">env</span>.<span class="pl-en">make_child_frame</span>(<span class="pl-s1">procedure</span>.<span class="pl-s1">formals</span>, <span class="pl-s1">args</span>)
+    <span class="pl-k">return</span> <span class="pl-en">eval_all</span>(<span class="pl-s1">procedure</span>.<span class="pl-s1">body</span>, <span class="pl-s1">frame</span>)
+    <span class="pl-c"># END PROBLEM 9</span></pre></div>
+<h2>Problem 10</h2>
+<blockquote>
+<p>之前实现的define定义symbol的情况，现在来处理定义一个procedure的情况</p>
+<ol>
+<li>首次提取procedure的symbol、arguments和body</li>
+<li>验证arguments是否符合规则</li>
+<li>创建一个lambda表达式</li>
+<li>向frame的bindings中建立映射</li>
+</ol>
+</blockquote>
+<div class="highlight highlight-source-python"><pre class="notranslate">    <span class="pl-s1">elif</span> <span class="pl-en">isinstance</span>(<span class="pl-s1">signature</span>, <span class="pl-v">Pair</span>) <span class="pl-c1">and</span> <span class="pl-en">scheme_symbolp</span>(<span class="pl-s1">signature</span>.<span class="pl-s1">first</span>):
+        <span class="pl-c"># defining a named procedure e.g. (define (f x y) (+ x y))</span>
+        <span class="pl-c"># BEGIN PROBLEM 10</span>
+        <span class="pl-s1">symbol</span> <span class="pl-c1">=</span> <span class="pl-s1">signature</span>.<span class="pl-s1">first</span>
+        <span class="pl-s1">formals</span> <span class="pl-c1">=</span> <span class="pl-s1">signature</span>.<span class="pl-s1">rest</span>
+        <span class="pl-s1">body</span> <span class="pl-c1">=</span> <span class="pl-s1">expressions</span>.<span class="pl-s1">rest</span>
+
+        <span class="pl-en">validate_formals</span>(<span class="pl-s1">formals</span>)
+
+        <span class="pl-s1">val</span> <span class="pl-c1">=</span> <span class="pl-v">LambdaProcedure</span>(<span class="pl-s1">formals</span>, <span class="pl-s1">body</span>, <span class="pl-s1">env</span>)
+        <span class="pl-s1">env</span>.<span class="pl-en">define</span>(<span class="pl-s1">symbol</span>, <span class="pl-s1">val</span>)
+        <span class="pl-k">return</span> <span class="pl-s1">symbol</span>
+        <span class="pl-c"># END PROBLEM 10</span></pre></div>
+<h2>Problem 11</h2>
+<blockquote>
+<p>do_mu_form： 执行时的父frame不取决于定义procedure的的frame，而取决于执行时的frame</p>
+</blockquote>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">do_mu_form</span>(<span class="pl-s1">expressions</span>, <span class="pl-s1">env</span>):
+    <span class="pl-s">"""Evaluate a mu form."""</span>
+    <span class="pl-en">validate_form</span>(<span class="pl-s1">expressions</span>, <span class="pl-c1">2</span>)
+    <span class="pl-s1">formals</span> <span class="pl-c1">=</span> <span class="pl-s1">expressions</span>.<span class="pl-s1">first</span>
+    <span class="pl-en">validate_formals</span>(<span class="pl-s1">formals</span>)
+    <span class="pl-c"># BEGIN PROBLEM 11</span>
+    <span class="pl-s1">body</span> <span class="pl-c1">=</span> <span class="pl-s1">expressions</span>.<span class="pl-s1">rest</span>
+    <span class="pl-k">return</span> <span class="pl-v">MuProcedure</span>(<span class="pl-s1">formals</span>, <span class="pl-s1">body</span>)
+    <span class="pl-c"># END PROBLEM 11</span></pre></div>
+<p>执行mu程序时，根据当前的frame去创建局部frame</p>
+<div class="highlight highlight-source-python"><pre class="notranslate">    <span class="pl-s1">elif</span> <span class="pl-en">isinstance</span>(<span class="pl-s1">procedure</span>, <span class="pl-v">MuProcedure</span>):
+        <span class="pl-c"># BEGIN PROBLEM 11</span>
+        <span class="pl-s1">frame</span> <span class="pl-c1">=</span> <span class="pl-s1">env</span>.<span class="pl-en">make_child_frame</span>(<span class="pl-s1">procedure</span>.<span class="pl-s1">formals</span>, <span class="pl-s1">args</span>)
+        <span class="pl-k">return</span> <span class="pl-en">eval_all</span>(<span class="pl-s1">procedure</span>.<span class="pl-s1">body</span>, <span class="pl-s1">frame</span>)</pre></div>
+<h2>Problem 12</h2>
+<blockquote>
+<p>处理and和if，规则在项目开始文件中已经描述的很清楚了</p>
+</blockquote>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">do_and_form</span>(<span class="pl-s1">expressions</span>, <span class="pl-s1">env</span>):
+    <span class="pl-s">"""Evaluate a (short-circuited) and form.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; env = create_global_frame()</span>
+<span class="pl-s">    &gt;&gt;&gt; do_and_form(read_line("(#f (print 1))"), env) # evaluating (and #f (print 1))</span>
+<span class="pl-s">    False</span>
+<span class="pl-s">    &gt;&gt;&gt; # evaluating (and (print 1) (print 2) (print 4) 3 #f)</span>
+<span class="pl-s">    &gt;&gt;&gt; do_and_form(read_line("((print 1) (print 2) (print 3) (print 4) 3 #f)"), env)</span>
+<span class="pl-s">    1</span>
+<span class="pl-s">    2</span>
+<span class="pl-s">    3</span>
+<span class="pl-s">    4</span>
+<span class="pl-s">    False</span>
+<span class="pl-s">    """</span>
+    <span class="pl-c"># BEGIN PROBLEM 12</span>
+    <span class="pl-k">while</span> <span class="pl-c1">not</span> <span class="pl-s1">expressions</span> <span class="pl-c1">is</span> <span class="pl-s1">nil</span>:
+        <span class="pl-s1">val</span> <span class="pl-c1">=</span> <span class="pl-en">scheme_eval</span>(<span class="pl-s1">expressions</span>.<span class="pl-s1">first</span>, <span class="pl-s1">env</span>)
+        <span class="pl-k">if</span> <span class="pl-en">is_scheme_false</span>(<span class="pl-s1">val</span>):
+            <span class="pl-k">return</span> <span class="pl-c1">False</span>
+        <span class="pl-k">if</span> <span class="pl-s1">expressions</span>.<span class="pl-s1">rest</span> <span class="pl-c1">is</span> <span class="pl-s1">nil</span>:
+            <span class="pl-k">return</span> <span class="pl-s1">val</span>
+        <span class="pl-s1">expressions</span> <span class="pl-c1">=</span> <span class="pl-s1">expressions</span>.<span class="pl-s1">rest</span>
+    <span class="pl-k">return</span> <span class="pl-c1">True</span>
+    <span class="pl-c"># END PROBLEM 12</span>
+
+<span class="pl-k">def</span> <span class="pl-en">do_or_form</span>(<span class="pl-s1">expressions</span>, <span class="pl-s1">env</span>):
+    <span class="pl-s">"""Evaluate a (short-circuited) or form.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; env = create_global_frame()</span>
+<span class="pl-s">    &gt;&gt;&gt; do_or_form(read_line("(10 (print 1))"), env) # evaluating (or 10 (print 1))</span>
+<span class="pl-s">    10</span>
+<span class="pl-s">    &gt;&gt;&gt; do_or_form(read_line("(#f 2 3 #t #f)"), env) # evaluating (or #f 2 3 #t #f)</span>
+<span class="pl-s">    2</span>
+<span class="pl-s">    &gt;&gt;&gt; # evaluating (or (begin (print 1) #f) (begin (print 2) #f) 6 (begin (print 3) 7))</span>
+<span class="pl-s">    &gt;&gt;&gt; do_or_form(read_line("((begin (print 1) #f) (begin (print 2) #f) 6 (begin (print 3) 7))"), env)</span>
+<span class="pl-s">    1</span>
+<span class="pl-s">    2</span>
+<span class="pl-s">    6</span>
+<span class="pl-s">    """</span>
+    <span class="pl-c"># BEGIN PROBLEM 12</span>
+    <span class="pl-k">while</span> <span class="pl-c1">not</span> <span class="pl-s1">expressions</span> <span class="pl-c1">is</span> <span class="pl-s1">nil</span>:
+        <span class="pl-s1">val</span> <span class="pl-c1">=</span> <span class="pl-en">scheme_eval</span>(<span class="pl-s1">expressions</span>.<span class="pl-s1">first</span>, <span class="pl-s1">env</span>)
+        <span class="pl-k">if</span> <span class="pl-en">is_scheme_true</span>(<span class="pl-s1">val</span>):
+            <span class="pl-k">return</span> <span class="pl-s1">val</span>
+        <span class="pl-s1">expressions</span> <span class="pl-c1">=</span> <span class="pl-s1">expressions</span>.<span class="pl-s1">rest</span>
+    <span class="pl-k">return</span> <span class="pl-c1">False</span>
+    <span class="pl-c"># END PROBLEM 12</span></pre></div>
+<h2>Problem 13</h2>
+<blockquote>
+<p>do_cond_form:  具有多个子表达式（包含else）,如果是else则直接返回表达式执行的结果。</p>
+<p>若是子表达式中条件表达式执行为真，则返回条件后面表达式执行的结果，若是条件表达式后面为空，则返回条件表达式执行的结果</p>
+</blockquote>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">do_cond_form</span>(<span class="pl-s1">expressions</span>, <span class="pl-s1">env</span>):
+    <span class="pl-s">"""Evaluate a cond form.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; do_cond_form(read_line("((#f (print 2)) (#t 3))"), create_global_frame())</span>
+<span class="pl-s">    3</span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">while</span> <span class="pl-s1">expressions</span> <span class="pl-c1">is</span> <span class="pl-c1">not</span> <span class="pl-s1">nil</span>:
+        <span class="pl-s1">clause</span> <span class="pl-c1">=</span> <span class="pl-s1">expressions</span>.<span class="pl-s1">first</span>
+        <span class="pl-en">validate_form</span>(<span class="pl-s1">clause</span>, <span class="pl-c1">1</span>)
+        <span class="pl-k">if</span> <span class="pl-s1">clause</span>.<span class="pl-s1">first</span> <span class="pl-c1">==</span> <span class="pl-s">'else'</span>:
+            <span class="pl-s1">test</span> <span class="pl-c1">=</span> <span class="pl-c1">True</span>
+            <span class="pl-k">if</span> <span class="pl-s1">expressions</span>.<span class="pl-s1">rest</span> <span class="pl-c1">!=</span> <span class="pl-s1">nil</span>:
+                <span class="pl-k">raise</span> <span class="pl-v">SchemeError</span>(<span class="pl-s">'else must be last'</span>)
+        <span class="pl-k">else</span>:
+            <span class="pl-s1">test</span> <span class="pl-c1">=</span> <span class="pl-en">scheme_eval</span>(<span class="pl-s1">clause</span>.<span class="pl-s1">first</span>, <span class="pl-s1">env</span>)
+        <span class="pl-k">if</span> <span class="pl-en">is_scheme_true</span>(<span class="pl-s1">test</span>):
+            <span class="pl-c"># BEGIN PROBLEM 13</span>
+                    
+            <span class="pl-s1">body</span> <span class="pl-c1">=</span> <span class="pl-s1">clause</span>.<span class="pl-s1">rest</span>
+            <span class="pl-k">if</span> <span class="pl-s1">body</span> <span class="pl-c1">is</span> <span class="pl-s1">nil</span>:
+                <span class="pl-k">return</span> <span class="pl-s1">test</span>
+            <span class="pl-k">return</span> <span class="pl-en">eval_all</span>(<span class="pl-s1">body</span>, <span class="pl-s1">env</span>)
+
+            <span class="pl-c"># END PROBLEM 13</span>
+        <span class="pl-s1">expressions</span> <span class="pl-c1">=</span> <span class="pl-s1">expressions</span>.<span class="pl-s1">rest</span></pre></div>
+<h2>Problem 14</h2>
+<blockquote>
+<p>make_let_frame:</p>
+<ol>
+<li>验证每个子表达式是否符合规范</li>
+<li>创建一个局部frame</li>
+<li>遍历执行每个子表达式（不包含需要返回执行结果的表达式）</li>
+</ol>
+</blockquote>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">make_let_frame</span>(<span class="pl-s1">bindings</span>, <span class="pl-s1">env</span>):
+    <span class="pl-s">"""Create a child frame of Frame ENV that contains the definitions given in</span>
+<span class="pl-s">    BINDINGS. The Scheme list BINDINGS must have the form of a proper bindings</span>
+<span class="pl-s">    list in a let expression: each item must be a list containing a symbol</span>
+<span class="pl-s">    and a Scheme expression."""</span>
+    <span class="pl-k">if</span> <span class="pl-c1">not</span> <span class="pl-en">scheme_listp</span>(<span class="pl-s1">bindings</span>):
+        <span class="pl-k">raise</span> <span class="pl-v">SchemeError</span>(<span class="pl-s">'bad bindings list in let form'</span>)
+    <span class="pl-s1">names</span> <span class="pl-c1">=</span> <span class="pl-s1">vals</span> <span class="pl-c1">=</span> <span class="pl-s1">nil</span>
+    <span class="pl-c"># BEGIN PROBLEM 14</span>
+    <span class="pl-en">validate_formals</span>(<span class="pl-s1">bindings</span>.<span class="pl-en">map</span>(<span class="pl-k">lambda</span> <span class="pl-s1">x</span>: <span class="pl-s1">x</span>.<span class="pl-s1">first</span>))
+    <span class="pl-s1">let_env</span> <span class="pl-c1">=</span> <span class="pl-v">Frame</span>(<span class="pl-s1">env</span>)
+    <span class="pl-k">while</span> <span class="pl-c1">not</span> <span class="pl-s1">bindings</span> <span class="pl-c1">is</span> <span class="pl-s1">nil</span>:
+        <span class="pl-s1">current</span> <span class="pl-c1">=</span> <span class="pl-s1">bindings</span>.<span class="pl-s1">first</span>
+        <span class="pl-en">validate_form</span>(<span class="pl-s1">current</span>.<span class="pl-s1">rest</span>, <span class="pl-c1">1</span>, <span class="pl-c1">1</span>)
+        <span class="pl-s1">let_env</span>.<span class="pl-en">define</span>(<span class="pl-s1">current</span>.<span class="pl-s1">first</span>, <span class="pl-en">scheme_eval</span>(<span class="pl-s1">current</span>.<span class="pl-s1">rest</span>.<span class="pl-s1">first</span>, <span class="pl-s1">env</span>))
+        <span class="pl-s1">bindings</span> <span class="pl-c1">=</span> <span class="pl-s1">bindings</span>.<span class="pl-s1">rest</span>
+    <span class="pl-k">return</span> <span class="pl-s1">let_env</span>
+    <span class="pl-c"># END PROBLEM 14</span></pre></div>
+<h2>Problem 15</h2>
+<div class="highlight highlight-source-scheme"><pre class="notranslate">(<span class="pl-k">define</span> (<span class="pl-en">enumerate2</span><span class="pl-smi"> s</span>)
+  (<span class="pl-k">begin</span> 
+    (<span class="pl-k">define</span> <span class="pl-smi">it</span> (<span class="pl-k">lambda</span> (<span class="pl-v">s i</span>) 
+          (<span class="pl-k">if</span> (<span class="pl-c1">null?</span> s) <span class="pl-c1">nil</span> (<span class="pl-c1">cons</span> (<span class="pl-c1">cons</span> i (<span class="pl-c1">cons</span> (<span class="pl-c1">car</span> s) nil)) (it (<span class="pl-c1">cdr</span> s) (<span class="pl-k">+</span> i <span class="pl-c1">1</span>))))
+        )
+    )   
+   (it s <span class="pl-c1">0</span>)
+  )
+)</pre></div>
+<h2>Problem 16</h2>
+<div class="highlight highlight-source-scheme"><pre class="notranslate">(<span class="pl-k">define</span> (<span class="pl-en">merge</span><span class="pl-smi"> ordered? s1 s2</span>)
+  (
+    <span class="pl-k">cond</span> 
+      ((<span class="pl-c1">null?</span> s1) s2)
+      ((<span class="pl-c1">null?</span> s2) s1)
+      ((ordered? (<span class="pl-c1">car</span> s1) (<span class="pl-c1">car</span> s2)) (<span class="pl-c1">cons</span> (<span class="pl-c1">car</span> s1) (merge ordered? (<span class="pl-c1">cdr</span> s1) s2)))
+      (<span class="pl-k">else</span> (<span class="pl-c1">cons</span> (<span class="pl-c1">car</span> s2) (merge ordered? s1 (<span class="pl-c1">cdr</span> s2))))
+    
+  )
+)</pre></div>
+<h2>EC Problem (pending)</h2></div>
+<div style="font-size:small;margin-top:8px;float:right;">转载请注明出处</div>
+
+<button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
+<div class="comments" id="comments"></div>
+
+</div>
+    <div id="footer"><div id="footer1">Copyright © <span id="copyrightYear"></span> <a href="https://LianSeKong.github.io/lizi">Lizi</a></div>
+<div id="footer2">
+    <span id="runday"></span><span>Powered by <a href="https://meekdai.com/Gmeek.html" target="_blank">Gmeek</a></span>
+</div>
+
+<script>
+var now=new Date();
+document.getElementById("copyrightYear").innerHTML=now.getFullYear();
+
+if(""!=""){
+    var startSite=new Date("");
+    var diff=now.getTime()-startSite.getTime();
+    var diffDay=Math.floor(diff/(1000*60*60*24));
+    document.getElementById("runday").innerHTML="网站运行"+diffDay+"天"+" • ";
+}
+</script></div>
+</body>
+<script>
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z', 'copy': 'M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z', 'check': 'M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'};
+var utterancesLoad=0;
+
+let themeSettings={
+    "dark": ["dark","moon","#00f0ff","dark-blue"],
+    "light": ["light","sun","#ff5000","github-light"],
+    "auto": ["auto","sync","","preferred-color-scheme"]
+};
+function changeTheme(mode, icon, color, utheme){
+    document.documentElement.setAttribute("data-color-mode",mode);
+    document.getElementById("themeSwitch").setAttribute("d",value=IconList[icon]);
+    document.getElementById("themeSwitch").parentNode.style.color=color;
+    if(utterancesLoad==1){utterancesTheme(utheme);}
+}
+function modeSwitch(){
+    let currentMode=document.documentElement.getAttribute('data-color-mode');
+    let newMode = currentMode === "light" ? "dark" : currentMode === "dark" ? "auto" : "light";
+    localStorage.setItem("meek_theme", newMode);
+    if(themeSettings[newMode]){
+        changeTheme(...themeSettings[newMode]);
+    }
+}
+function utterancesTheme(theme){
+    const message={type:'set-theme',theme: theme};
+    const iframe=document.getElementsByClassName('utterances-frame')[0];
+    iframe.contentWindow.postMessage(message,'https://utteranc.es');
+}
+if(themeSettings[theme]){changeTheme(...themeSettings[theme]);}
+console.log("\n %c Gmeek last https://github.com/Meekdai/Gmeek \n","padding:5px 0;background:#02d81d;color:#fff");
+</script>
+
+<script>
+document.getElementById("pathHome").setAttribute("d",IconList["home"]);
+document.getElementById("pathIssue").setAttribute("d",IconList["github"]);
+
+
+
+function openComments(){
+    cm=document.getElementById("comments");
+    cmButton=document.getElementById("cmButton");
+    cmButton.innerHTML="loading";
+    span=document.createElement("span");
+    span.setAttribute("class","AnimatedEllipsis");
+    cmButton.appendChild(span);
+
+    script=document.createElement("script");
+    script.setAttribute("src","https://utteranc.es/client.js");
+    script.setAttribute("repo","LianSeKong/lizi");
+    script.setAttribute("issue-term","title");
+    
+    if(localStorage.getItem("meek_theme")=="dark"){script.setAttribute("theme","dark-blue");}
+    else if(localStorage.getItem("meek_theme")=="light") {script.setAttribute("theme","github-light");}
+    else{script.setAttribute("theme","preferred-color-scheme");}
+    
+    script.setAttribute("crossorigin","anonymous");
+    script.setAttribute("async","");
+    cm.appendChild(script);
+
+    int=self.setInterval("iFrameLoading()",200);
+}
+
+function iFrameLoading(){
+    var utterances=document.getElementsByClassName('utterances');
+    if(utterances.length==1){
+        if(utterances[0].style.height!=""){
+            utterancesLoad=1;
+            int=window.clearInterval(int);
+            document.getElementById("cmButton").style.display="none";
+            console.log("utterances Load OK");
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const createClipboardHTML = (codeContent, additionalClasses = '') => `
+        <pre class="notranslate"><code class="notranslate">${codeContent}</code></pre>
+        <div class="clipboard-container position-absolute right-0 top-0 ${additionalClasses}">
+            <clipboard-copy class="ClipboardButton btn m-2 p-0" role="button" style="display: inherit;">
+                <svg height="16" width="16" class="octicon octicon-copy m-2"><path d="${IconList["copy"]}"></path></svg>
+                <svg height="16" width="16" class="octicon octicon-check color-fg-success m-2 d-none"><path d="${IconList["check"]}"></path></svg>
+            </clipboard-copy>
+            <div class="copy-feedback">Copied!</div>
+        </div>
+    `;
+
+    const handleCodeElements = (selector = '') => {
+        document.querySelectorAll(selector).forEach(codeElement => {
+            const codeContent = codeElement.innerHTML;
+            const newStructure = document.createElement('div');
+            newStructure.className = 'snippet-clipboard-content position-relative overflow-auto';
+            newStructure.innerHTML = createClipboardHTML(codeContent);
+
+            const parentElement = codeElement.parentElement;
+            if (selector.includes('highlight')) {
+                parentElement.insertBefore(newStructure, codeElement.nextSibling);
+                parentElement.removeChild(codeElement);
+            } else {
+                parentElement.parentElement.replaceChild(newStructure, parentElement);
+            }
+        });
+    };
+
+    handleCodeElements('pre.notranslate > code.notranslate');
+    handleCodeElements('div.highlight > pre.notranslate');
+
+    let currentFeedback = null;
+    document.querySelectorAll('clipboard-copy').forEach(copyButton => {
+        copyButton.addEventListener('click', () => {
+            const codeContent = copyButton.closest('.snippet-clipboard-content').innerText;
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = codeContent;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            const copyIcon = copyButton.querySelector('.octicon-copy');
+            const checkIcon = copyButton.querySelector('.octicon-check');
+            const copyFeedback = copyButton.nextElementSibling;
+
+            if (currentFeedback && currentFeedback !== copyFeedback) {currentFeedback.style.display = 'none';}
+            currentFeedback = copyFeedback;
+
+            copyIcon.classList.add('d-none');
+            checkIcon.classList.remove('d-none');
+            copyFeedback.style.display = 'block';
+            copyButton.style.borderColor = 'var(--color-success-fg)';
+
+            setTimeout(() => {
+                copyIcon.classList.remove('d-none');
+                checkIcon.classList.add('d-none');
+                copyFeedback.style.display = 'none';
+                copyButton.style.borderColor = '';
+            }, 2000);
+        });
+    });
+});
+
+</script>
+
+
+</html>
