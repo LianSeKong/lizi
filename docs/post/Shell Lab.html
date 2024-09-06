@@ -10,14 +10,748 @@
         let theme = localStorage.getItem("meek_theme") || "light";
         document.documentElement.setAttribute("data-color-mode", theme);
     </script>
-<meta name="description" content="# Shell Lab。">
+<meta name="description" content="``` c
+/*
+ * tsh - A tiny shell program with job control
+ *
+ * <Put your name and login ID here>
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <ctype.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <errno.h>
+
+/* Misc manifest constants */
+#define MAXLINE 1024   /* max line size */
+#define MAXARGS 128    /* max args on a command line */
+#define MAXJOBS 16     /* max jobs at any point in time */
+#define MAXJID 1 << 16 /* max job ID */
+
+/* Job states */
+#define UNDEF 0 /* undefined */
+#define FG 1    /* running in foreground */
+#define BG 2    /* running in background */
+#define ST 3    /* stopped */
+
+/*
+ * Jobs states: FG (foreground), BG (background), ST (stopped)
+ * Job state transitions and enabling actions:
+ *     FG -> ST  : ctrl-z
+ *     ST -> FG  : fg command
+ *     ST -> BG  : bg command
+ *     BG -> FG  : fg command
+ * At most 1 job can be in the FG state.
+ */
+
+/* Global variables */
+extern char **environ;   /* defined in libc */
+char prompt[] = 'tsh> '; /* command line prompt (DO NOT CHANGE) */
+int verbose = 0;         /* if true, print additional output */
+int nextjid = 1;         /* next job ID to allocate */
+char sbuf[MAXLINE];      /* for composing sprintf messages */
+
+struct job_t
+{                          /* The job struct */
+    pid_t pid;             /* job PID */
+    int jid;               /* job ID [1, 2, ...] */
+    int state;             /* UNDEF, BG, FG, or ST */
+    char cmdline[MAXLINE]; /* command line */
+};
+struct job_t jobs[MAXJOBS]; /* The job list */
+/* End global variables */
+
+/* Function prototypes */
+
+/* Here are the functions that you will implement */
+void eval(char *cmdline);
+int builtin_cmd(char **argv);
+void do_bgfg(char **argv);
+void waitfg(pid_t pid);
+
+void sigchld_handler(int sig);
+void sigtstp_handler(int sig);
+void sigint_handler(int sig);
+
+/* Here are helper routines that we've provided for you */
+int parseline(const char *cmdline, char **argv);
+void sigquit_handler(int sig);
+
+void clearjob(struct job_t *job);
+void initjobs(struct job_t *jobs);
+int maxjid(struct job_t *jobs);
+int addjob(struct job_t *jobs, pid_t pid, int state, char *cmdline);
+int deletejob(struct job_t *jobs, pid_t pid);
+pid_t fgpid(struct job_t *jobs);
+struct job_t *getjobpid(struct job_t *jobs, pid_t pid);
+struct job_t *getjobjid(struct job_t *jobs, int jid);
+int pid2jid(pid_t pid);
+void listjobs(struct job_t *jobs);
+
+void usage(void);
+void unix_error(char *msg);
+void app_error(char *msg);
+typedef void handler_t(int);
+handler_t *Signal(int signum, handler_t *handler);
+
+/*
+ * main - The shell's main routine
+ */
+int main(int argc, char **argv)
+{
+    char c;
+    char cmdline[MAXLINE];
+    int emit_prompt = 1; /* emit prompt (default) */
+
+    /* Redirect stderr to stdout (so that driver will get all output
+     * on the pipe connected to stdout) */
+    dup2(1, 2);
+
+    /* Parse the command line */
+    while ((c = getopt(argc, argv, 'hvp')) != EOF)
+    {
+        switch (c)
+        {
+        case 'h': /* print help message */
+            usage();
+            break;
+        case 'v': /* emit additional diagnostic info */
+            verbose = 1;
+            break;
+        case 'p':            /* don't print a prompt */
+            emit_prompt = 0; /* handy for automatic testing */
+            break;
+        default:
+            usage();
+        }
+    }
+
+    /* Install the signal handlers */
+
+    /* These are the ones you will need to implement */
+    Signal(SIGINT, sigint_handler);   /* ctrl-c */
+    Signal(SIGTSTP, sigtstp_handler); /* ctrl-z */
+    Signal(SIGCHLD, sigchld_handler); /* Terminated or stopped child */
+
+    /* This one provides a clean way to kill the shell */
+    Signal(SIGQUIT, sigquit_handler);
+
+    /* Initialize the job list */
+    initjobs(jobs);
+
+    /* Execute the shell's read/eval loop */
+    while (1)
+    {
+
+        /* Read command line */
+        if (emit_prompt)
+        {
+            printf('%s', prompt);
+            fflush(stdout);
+        }
+        if ((fgets(cmdline, MAXLINE, stdin) == NULL) && ferror(stdin))
+            app_error('fgets error');
+        if (feof(stdin))
+        { /* End of file (ctrl-d) */
+            fflush(stdout);
+            exit(0);
+        }
+
+        /* Evaluate the command line */
+        eval(cmdline);
+        fflush(stdout);
+        fflush(stdout);
+    }
+
+    exit(0); /* control never reaches here */
+}
+
+/*
+ * eval - Evaluate the command line that the user has just typed in
+ *
+ * If the user has requested a built-in command (quit, jobs, bg or fg)
+ * then execute it immediately. Otherwise, fork a child process and
+ * run the job in the context of the child. If the job is running in
+ * the foreground, wait for it to terminate and then return.  Note:
+ * each child process must have a unique process group ID so that our
+ * background children don't receive SIGINT (SIGTSTP) from the kernel
+ * when we type ctrl-c (ctrl-z) at the keyboard.
+ */
+void eval(char *cmdline)
+{
+    char *argv[MAXARGS]; /* argv for execve() */
+    int bg;              /* should the job run in bg or fg? */
+    pid_t pid;           /* process id */
+    sigset_t mask_one, mask_all, prev;
+
+    // 设置阻塞信号
+    sigfillset(&mask_all); // Set all signal bits
+
+    sigemptyset(&mask_one);        // Clear all signal bits
+    sigaddset(&mask_one, SIGCHLD); // Add SIGCHLD signal
+
+    bg = parseline(cmdline, argv); // Parse command line, formart result into argv
+
+    if (argv[0] == NULL)
+    {
+        return; // Ignore empty links
+    }
+
+    if (!builtin_cmd(argv)) // NOT builtin_cmd
+    {
+        /**
+         * Block SIGCHLD, avoid race
+         * Ensure addjob executed before dealing the sigchld
+         *
+         */
+        sigprocmask(SIG_BLOCK, &mask_one, &prev);
+        if ((pid = fork()) == 0)
+        {                                          /* child process */
+            sigprocmask(SIG_SETMASK, &prev, NULL); // Unblock sigchld of children process
+            setpgid(0, 0);                         // Set unique process group ID
+
+            /* Background jobs should ignore SIGINT (ctrl-c)
+             * and SIGTSTP (ctrl-z) */
+            if (bg)
+            {
+                Signal(SIGINT, SIG_IGN);
+                Signal(SIGTSTP, SIG_IGN);
+            }
+            char *path = argv[0];
+            if (execve(path, argv, environ) < 0)
+            {
+                sigprocmask(SIG_BLOCK, &mask_all, NULL);
+                printf('%s: Command not found.\n', path);
+                sigprocmask(SIG_SETMASK, &prev, NULL);
+                fflush(stdout);
+            }
+            exit(0);
+        }
+        // Setting all signal bits is blocked, guarantee addjob executed
+        sigprocmask(SIG_BLOCK, &mask_all, NULL);
+        addjob(jobs, pid, (bg == 1 ? BG : FG), cmdline);
+        sigprocmask(SIG_SETMASK, &mask_one, NULL);
+        if (bg == 1)
+        {
+            printf('[%d] (%d) %s', pid2jid(pid), pid, cmdline);
+        }
+        else
+        {
+            waitfg(pid);
+        }
+        sigprocmask(SIG_SETMASK, &prev, NULL); // Unmask all bits
+    }
+    return;
+}
+
+/*
+ * parseline - Parse the command line and build the argv array.
+ *
+ * Characters enclosed in single quotes are treated as a single
+ * argument.  Return true if the user has requested a BG job, false if
+ * the user has requested a FG job.
+ */
+int parseline(const char *cmdline, char **argv)
+{
+    static char array[MAXLINE]; /* holds local copy of command line */
+    char *buf = array;          /* ptr that traverses command line */
+    char *delim;                /* points to first space delimiter */
+    int argc;                   /* number of args */
+    int bg;                     /* background job? */
+
+    strcpy(buf, cmdline);
+    buf[strlen(buf) - 1] = ' ';   /* replace trailing '\n' with space */
+    while (*buf && (*buf == ' ')) /* ignore leading spaces */
+        buf++;
+
+    /* Build the argv list */
+    argc = 0;
+    if (*buf == '\'')
+    {
+        buf++;
+        delim = strchr(buf, '\'');
+    }
+    else
+    {
+        delim = strchr(buf, ' ');
+    }
+
+    while (delim)
+    {
+        argv[argc++] = buf;
+        *delim = '\0';
+        buf = delim + 1;
+        while (*buf && (*buf == ' ')) /* ignore spaces */
+            buf++;
+
+        if (*buf == '\'')
+        {
+            buf++;
+            delim = strchr(buf, '\'');
+        }
+        else
+        {
+            delim = strchr(buf, ' ');
+        }
+    }
+    argv[argc] = NULL;
+
+    if (argc == 0) /* ignore blank line */
+        return 1;
+
+    /* should the job run in the background? */
+    if ((bg = (*argv[argc - 1] == '&')) != 0)
+    {
+        argv[--argc] = NULL;
+    }
+    return bg;
+}
+
+/*
+ * builtin_cmd - If the user has typed a built-in command then execute
+ *    it immediately.
+ */
+int builtin_cmd(char **argv)
+{
+    char *cmd = argv[0];
+    if (strcmp(cmd, 'quit') == 0)
+        exit(0); /* terminate shell */
+    else if (strcmp(cmd, 'jobs') == 0)
+    {
+        listjobs(jobs);
+        return 1;
+    }
+    else if (strcmp(cmd, 'bg') == 0 || strcmp(cmd, 'fg') == 0)
+    {
+        do_bgfg(argv);
+        return 1;
+    }
+    else if (strcmp(argv[0], '&') == 0)
+    {
+        return 1;
+    }
+    return 0; /* not a builtin command */
+}
+
+/*
+ * do_bgfg - Execute the builtin bg and fg commands
+ */
+void do_bgfg(char **argv)
+{
+    char *cmd = argv[0];
+    if (argv[1] == NULL)
+    {
+        printf('%s command requires PID or %%jobid argument\n', cmd);
+        return;
+    }
+    int id;
+    struct job_t *ptr;
+    if (argv[1][0] == '%')
+    {
+        if ((id = atoi(argv[1] + 1)) == 0)
+        {
+            printf('%s: argument must be a PID or %%jobid\n', cmd);
+            return;
+        }
+        if ((ptr = getjobjid(jobs, id)) == NULL)
+        {
+            printf('%%%d: No such job\n', id);
+            return;
+        }
+    }
+    else
+    {
+
+        if ((id = atoi(argv[1])) == 0)
+        {
+            printf('%s: argument must be a PID or %%jobid\n', cmd);
+            return;
+        }
+        if ((ptr = getjobpid(jobs, id)) == NULL)
+        {
+            printf('(%d) : No such process\n', id);
+            return;
+        }
+    }
+    // 如果 pid < -1，则信号 sig 将发送给进程组 ID 等于 pid 的所有进程。">
 <meta property="og:title" content="Shell Lab">
-<meta property="og:description" content="# Shell Lab。">
+<meta property="og:description" content="``` c
+/*
+ * tsh - A tiny shell program with job control
+ *
+ * <Put your name and login ID here>
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <ctype.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <errno.h>
+
+/* Misc manifest constants */
+#define MAXLINE 1024   /* max line size */
+#define MAXARGS 128    /* max args on a command line */
+#define MAXJOBS 16     /* max jobs at any point in time */
+#define MAXJID 1 << 16 /* max job ID */
+
+/* Job states */
+#define UNDEF 0 /* undefined */
+#define FG 1    /* running in foreground */
+#define BG 2    /* running in background */
+#define ST 3    /* stopped */
+
+/*
+ * Jobs states: FG (foreground), BG (background), ST (stopped)
+ * Job state transitions and enabling actions:
+ *     FG -> ST  : ctrl-z
+ *     ST -> FG  : fg command
+ *     ST -> BG  : bg command
+ *     BG -> FG  : fg command
+ * At most 1 job can be in the FG state.
+ */
+
+/* Global variables */
+extern char **environ;   /* defined in libc */
+char prompt[] = 'tsh> '; /* command line prompt (DO NOT CHANGE) */
+int verbose = 0;         /* if true, print additional output */
+int nextjid = 1;         /* next job ID to allocate */
+char sbuf[MAXLINE];      /* for composing sprintf messages */
+
+struct job_t
+{                          /* The job struct */
+    pid_t pid;             /* job PID */
+    int jid;               /* job ID [1, 2, ...] */
+    int state;             /* UNDEF, BG, FG, or ST */
+    char cmdline[MAXLINE]; /* command line */
+};
+struct job_t jobs[MAXJOBS]; /* The job list */
+/* End global variables */
+
+/* Function prototypes */
+
+/* Here are the functions that you will implement */
+void eval(char *cmdline);
+int builtin_cmd(char **argv);
+void do_bgfg(char **argv);
+void waitfg(pid_t pid);
+
+void sigchld_handler(int sig);
+void sigtstp_handler(int sig);
+void sigint_handler(int sig);
+
+/* Here are helper routines that we've provided for you */
+int parseline(const char *cmdline, char **argv);
+void sigquit_handler(int sig);
+
+void clearjob(struct job_t *job);
+void initjobs(struct job_t *jobs);
+int maxjid(struct job_t *jobs);
+int addjob(struct job_t *jobs, pid_t pid, int state, char *cmdline);
+int deletejob(struct job_t *jobs, pid_t pid);
+pid_t fgpid(struct job_t *jobs);
+struct job_t *getjobpid(struct job_t *jobs, pid_t pid);
+struct job_t *getjobjid(struct job_t *jobs, int jid);
+int pid2jid(pid_t pid);
+void listjobs(struct job_t *jobs);
+
+void usage(void);
+void unix_error(char *msg);
+void app_error(char *msg);
+typedef void handler_t(int);
+handler_t *Signal(int signum, handler_t *handler);
+
+/*
+ * main - The shell's main routine
+ */
+int main(int argc, char **argv)
+{
+    char c;
+    char cmdline[MAXLINE];
+    int emit_prompt = 1; /* emit prompt (default) */
+
+    /* Redirect stderr to stdout (so that driver will get all output
+     * on the pipe connected to stdout) */
+    dup2(1, 2);
+
+    /* Parse the command line */
+    while ((c = getopt(argc, argv, 'hvp')) != EOF)
+    {
+        switch (c)
+        {
+        case 'h': /* print help message */
+            usage();
+            break;
+        case 'v': /* emit additional diagnostic info */
+            verbose = 1;
+            break;
+        case 'p':            /* don't print a prompt */
+            emit_prompt = 0; /* handy for automatic testing */
+            break;
+        default:
+            usage();
+        }
+    }
+
+    /* Install the signal handlers */
+
+    /* These are the ones you will need to implement */
+    Signal(SIGINT, sigint_handler);   /* ctrl-c */
+    Signal(SIGTSTP, sigtstp_handler); /* ctrl-z */
+    Signal(SIGCHLD, sigchld_handler); /* Terminated or stopped child */
+
+    /* This one provides a clean way to kill the shell */
+    Signal(SIGQUIT, sigquit_handler);
+
+    /* Initialize the job list */
+    initjobs(jobs);
+
+    /* Execute the shell's read/eval loop */
+    while (1)
+    {
+
+        /* Read command line */
+        if (emit_prompt)
+        {
+            printf('%s', prompt);
+            fflush(stdout);
+        }
+        if ((fgets(cmdline, MAXLINE, stdin) == NULL) && ferror(stdin))
+            app_error('fgets error');
+        if (feof(stdin))
+        { /* End of file (ctrl-d) */
+            fflush(stdout);
+            exit(0);
+        }
+
+        /* Evaluate the command line */
+        eval(cmdline);
+        fflush(stdout);
+        fflush(stdout);
+    }
+
+    exit(0); /* control never reaches here */
+}
+
+/*
+ * eval - Evaluate the command line that the user has just typed in
+ *
+ * If the user has requested a built-in command (quit, jobs, bg or fg)
+ * then execute it immediately. Otherwise, fork a child process and
+ * run the job in the context of the child. If the job is running in
+ * the foreground, wait for it to terminate and then return.  Note:
+ * each child process must have a unique process group ID so that our
+ * background children don't receive SIGINT (SIGTSTP) from the kernel
+ * when we type ctrl-c (ctrl-z) at the keyboard.
+ */
+void eval(char *cmdline)
+{
+    char *argv[MAXARGS]; /* argv for execve() */
+    int bg;              /* should the job run in bg or fg? */
+    pid_t pid;           /* process id */
+    sigset_t mask_one, mask_all, prev;
+
+    // 设置阻塞信号
+    sigfillset(&mask_all); // Set all signal bits
+
+    sigemptyset(&mask_one);        // Clear all signal bits
+    sigaddset(&mask_one, SIGCHLD); // Add SIGCHLD signal
+
+    bg = parseline(cmdline, argv); // Parse command line, formart result into argv
+
+    if (argv[0] == NULL)
+    {
+        return; // Ignore empty links
+    }
+
+    if (!builtin_cmd(argv)) // NOT builtin_cmd
+    {
+        /**
+         * Block SIGCHLD, avoid race
+         * Ensure addjob executed before dealing the sigchld
+         *
+         */
+        sigprocmask(SIG_BLOCK, &mask_one, &prev);
+        if ((pid = fork()) == 0)
+        {                                          /* child process */
+            sigprocmask(SIG_SETMASK, &prev, NULL); // Unblock sigchld of children process
+            setpgid(0, 0);                         // Set unique process group ID
+
+            /* Background jobs should ignore SIGINT (ctrl-c)
+             * and SIGTSTP (ctrl-z) */
+            if (bg)
+            {
+                Signal(SIGINT, SIG_IGN);
+                Signal(SIGTSTP, SIG_IGN);
+            }
+            char *path = argv[0];
+            if (execve(path, argv, environ) < 0)
+            {
+                sigprocmask(SIG_BLOCK, &mask_all, NULL);
+                printf('%s: Command not found.\n', path);
+                sigprocmask(SIG_SETMASK, &prev, NULL);
+                fflush(stdout);
+            }
+            exit(0);
+        }
+        // Setting all signal bits is blocked, guarantee addjob executed
+        sigprocmask(SIG_BLOCK, &mask_all, NULL);
+        addjob(jobs, pid, (bg == 1 ? BG : FG), cmdline);
+        sigprocmask(SIG_SETMASK, &mask_one, NULL);
+        if (bg == 1)
+        {
+            printf('[%d] (%d) %s', pid2jid(pid), pid, cmdline);
+        }
+        else
+        {
+            waitfg(pid);
+        }
+        sigprocmask(SIG_SETMASK, &prev, NULL); // Unmask all bits
+    }
+    return;
+}
+
+/*
+ * parseline - Parse the command line and build the argv array.
+ *
+ * Characters enclosed in single quotes are treated as a single
+ * argument.  Return true if the user has requested a BG job, false if
+ * the user has requested a FG job.
+ */
+int parseline(const char *cmdline, char **argv)
+{
+    static char array[MAXLINE]; /* holds local copy of command line */
+    char *buf = array;          /* ptr that traverses command line */
+    char *delim;                /* points to first space delimiter */
+    int argc;                   /* number of args */
+    int bg;                     /* background job? */
+
+    strcpy(buf, cmdline);
+    buf[strlen(buf) - 1] = ' ';   /* replace trailing '\n' with space */
+    while (*buf && (*buf == ' ')) /* ignore leading spaces */
+        buf++;
+
+    /* Build the argv list */
+    argc = 0;
+    if (*buf == '\'')
+    {
+        buf++;
+        delim = strchr(buf, '\'');
+    }
+    else
+    {
+        delim = strchr(buf, ' ');
+    }
+
+    while (delim)
+    {
+        argv[argc++] = buf;
+        *delim = '\0';
+        buf = delim + 1;
+        while (*buf && (*buf == ' ')) /* ignore spaces */
+            buf++;
+
+        if (*buf == '\'')
+        {
+            buf++;
+            delim = strchr(buf, '\'');
+        }
+        else
+        {
+            delim = strchr(buf, ' ');
+        }
+    }
+    argv[argc] = NULL;
+
+    if (argc == 0) /* ignore blank line */
+        return 1;
+
+    /* should the job run in the background? */
+    if ((bg = (*argv[argc - 1] == '&')) != 0)
+    {
+        argv[--argc] = NULL;
+    }
+    return bg;
+}
+
+/*
+ * builtin_cmd - If the user has typed a built-in command then execute
+ *    it immediately.
+ */
+int builtin_cmd(char **argv)
+{
+    char *cmd = argv[0];
+    if (strcmp(cmd, 'quit') == 0)
+        exit(0); /* terminate shell */
+    else if (strcmp(cmd, 'jobs') == 0)
+    {
+        listjobs(jobs);
+        return 1;
+    }
+    else if (strcmp(cmd, 'bg') == 0 || strcmp(cmd, 'fg') == 0)
+    {
+        do_bgfg(argv);
+        return 1;
+    }
+    else if (strcmp(argv[0], '&') == 0)
+    {
+        return 1;
+    }
+    return 0; /* not a builtin command */
+}
+
+/*
+ * do_bgfg - Execute the builtin bg and fg commands
+ */
+void do_bgfg(char **argv)
+{
+    char *cmd = argv[0];
+    if (argv[1] == NULL)
+    {
+        printf('%s command requires PID or %%jobid argument\n', cmd);
+        return;
+    }
+    int id;
+    struct job_t *ptr;
+    if (argv[1][0] == '%')
+    {
+        if ((id = atoi(argv[1] + 1)) == 0)
+        {
+            printf('%s: argument must be a PID or %%jobid\n', cmd);
+            return;
+        }
+        if ((ptr = getjobjid(jobs, id)) == NULL)
+        {
+            printf('%%%d: No such job\n', id);
+            return;
+        }
+    }
+    else
+    {
+
+        if ((id = atoi(argv[1])) == 0)
+        {
+            printf('%s: argument must be a PID or %%jobid\n', cmd);
+            return;
+        }
+        if ((ptr = getjobpid(jobs, id)) == NULL)
+        {
+            printf('(%d) : No such process\n', id);
+            return;
+        }
+    }
+    // 如果 pid < -1，则信号 sig 将发送给进程组 ID 等于 pid 的所有进程。">
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://LianSeKong.github.io/lizi/post/Shell%20Lab.html">
 <meta property="og:image" content="https://img.icons8.com/doodle/480/mugman.png">
 <title>Shell Lab</title>
-
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
 
 
 </head>
@@ -41,7 +775,17 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
     body {padding: 8px;}
     .postTitle{font-size:24px;}
 }
-
+.copy-feedback {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 50px;
+    color: var(--color-fg-on-emphasis);
+    background-color: var(--color-fg-muted);
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
 </style>
 
 
@@ -73,7 +817,718 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 </div>
 </div>
     <div id="content">
-<div class="markdown-body" id="postBody"><h1>Shell Lab</h1></div>
+<div class="markdown-body" id="postBody"><div class="highlight highlight-source-c"><pre class="notranslate"><span class="pl-c">/*</span>
+<span class="pl-c"> * tsh - A tiny shell program with job control</span>
+<span class="pl-c"> *</span>
+<span class="pl-c"> * &lt;Put your name and login ID here&gt;</span>
+<span class="pl-c"> */</span>
+<span class="pl-k">#include</span> <span class="pl-s">&lt;stdio.h&gt;</span>
+<span class="pl-k">#include</span> <span class="pl-s">&lt;stdlib.h&gt;</span>
+<span class="pl-k">#include</span> <span class="pl-s">&lt;unistd.h&gt;</span>
+<span class="pl-k">#include</span> <span class="pl-s">&lt;string.h&gt;</span>
+<span class="pl-k">#include</span> <span class="pl-s">&lt;ctype.h&gt;</span>
+<span class="pl-k">#include</span> <span class="pl-s">&lt;signal.h&gt;</span>
+<span class="pl-k">#include</span> <span class="pl-s">&lt;sys/types.h&gt;</span>
+<span class="pl-k">#include</span> <span class="pl-s">&lt;sys/wait.h&gt;</span>
+<span class="pl-k">#include</span> <span class="pl-s">&lt;errno.h&gt;</span>
+
+<span class="pl-c">/* Misc manifest constants */</span>
+<span class="pl-k">#define</span> <span class="pl-c1">MAXLINE</span> 1024   /* max line size */
+<span class="pl-k">#define</span> <span class="pl-c1">MAXARGS</span> 128    /* max args on a command line */
+<span class="pl-k">#define</span> <span class="pl-c1">MAXJOBS</span> 16     /* max jobs at any point in time */
+<span class="pl-k">#define</span> <span class="pl-c1">MAXJID</span> 1 &lt;&lt; 16 /* max job ID */
+
+<span class="pl-c">/* Job states */</span>
+<span class="pl-k">#define</span> <span class="pl-c1">UNDEF</span> 0 /* undefined */
+<span class="pl-k">#define</span> <span class="pl-c1">FG</span> 1    /* running in foreground */
+<span class="pl-k">#define</span> <span class="pl-c1">BG</span> 2    /* running in background */
+<span class="pl-k">#define</span> <span class="pl-c1">ST</span> 3    /* stopped */
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * Jobs states: FG (foreground), BG (background), ST (stopped)</span>
+<span class="pl-c"> * Job state transitions and enabling actions:</span>
+<span class="pl-c"> *     FG -&gt; ST  : ctrl-z</span>
+<span class="pl-c"> *     ST -&gt; FG  : fg command</span>
+<span class="pl-c"> *     ST -&gt; BG  : bg command</span>
+<span class="pl-c"> *     BG -&gt; FG  : fg command</span>
+<span class="pl-c"> * At most 1 job can be in the FG state.</span>
+<span class="pl-c"> */</span>
+
+<span class="pl-c">/* Global variables */</span>
+<span class="pl-k">extern</span> <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-c1">*</span><span class="pl-s1">environ</span>;   <span class="pl-c">/* defined in libc */</span>
+<span class="pl-smi">char</span> <span class="pl-s1">prompt</span>[] <span class="pl-c1">=</span> <span class="pl-s">"tsh&gt; "</span>; <span class="pl-c">/* command line prompt (DO NOT CHANGE) */</span>
+<span class="pl-smi">int</span> <span class="pl-s1">verbose</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>;         <span class="pl-c">/* if true, print additional output */</span>
+<span class="pl-smi">int</span> <span class="pl-s1">nextjid</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span>;         <span class="pl-c">/* next job ID to allocate */</span>
+<span class="pl-smi">char</span> <span class="pl-s1">sbuf</span>[<span class="pl-c1">MAXLINE</span>];      <span class="pl-c">/* for composing sprintf messages */</span>
+
+<span class="pl-k">struct</span> <span class="pl-smi">job_t</span>
+{                          <span class="pl-c">/* The job struct */</span>
+    <span class="pl-smi">pid_t</span> <span class="pl-c1">pid</span>;             <span class="pl-c">/* job PID */</span>
+    <span class="pl-smi">int</span> <span class="pl-c1">jid</span>;               <span class="pl-c">/* job ID [1, 2, ...] */</span>
+    <span class="pl-smi">int</span> <span class="pl-c1">state</span>;             <span class="pl-c">/* UNDEF, BG, FG, or ST */</span>
+    <span class="pl-smi">char</span> <span class="pl-c1">cmdline</span>[<span class="pl-c1">MAXLINE</span>]; <span class="pl-c">/* command line */</span>
+};
+<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-s1">jobs</span>[<span class="pl-c1">MAXJOBS</span>]; <span class="pl-c">/* The job list */</span>
+<span class="pl-c">/* End global variables */</span>
+
+<span class="pl-c">/* Function prototypes */</span>
+
+<span class="pl-c">/* Here are the functions that you will implement */</span>
+<span class="pl-smi">void</span> <span class="pl-en">eval</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">cmdline</span>);
+<span class="pl-smi">int</span> <span class="pl-en">builtin_cmd</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-c1">*</span><span class="pl-s1">argv</span>);
+<span class="pl-smi">void</span> <span class="pl-en">do_bgfg</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-c1">*</span><span class="pl-s1">argv</span>);
+<span class="pl-smi">void</span> <span class="pl-en">waitfg</span>(<span class="pl-smi">pid_t</span> <span class="pl-s1">pid</span>);
+
+<span class="pl-smi">void</span> <span class="pl-en">sigchld_handler</span>(<span class="pl-smi">int</span> <span class="pl-s1">sig</span>);
+<span class="pl-smi">void</span> <span class="pl-en">sigtstp_handler</span>(<span class="pl-smi">int</span> <span class="pl-s1">sig</span>);
+<span class="pl-smi">void</span> <span class="pl-en">sigint_handler</span>(<span class="pl-smi">int</span> <span class="pl-s1">sig</span>);
+
+<span class="pl-c">/* Here are helper routines that we've provided for you */</span>
+<span class="pl-smi">int</span> <span class="pl-en">parseline</span>(<span class="pl-k">const</span> <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">cmdline</span>, <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-c1">*</span><span class="pl-s1">argv</span>);
+<span class="pl-smi">void</span> <span class="pl-en">sigquit_handler</span>(<span class="pl-smi">int</span> <span class="pl-s1">sig</span>);
+
+<span class="pl-smi">void</span> <span class="pl-en">clearjob</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">job</span>);
+<span class="pl-smi">void</span> <span class="pl-en">initjobs</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>);
+<span class="pl-smi">int</span> <span class="pl-en">maxjid</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>);
+<span class="pl-smi">int</span> <span class="pl-en">addjob</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>, <span class="pl-smi">pid_t</span> <span class="pl-s1">pid</span>, <span class="pl-smi">int</span> <span class="pl-s1">state</span>, <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">cmdline</span>);
+<span class="pl-smi">int</span> <span class="pl-en">deletejob</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>, <span class="pl-smi">pid_t</span> <span class="pl-s1">pid</span>);
+<span class="pl-smi">pid_t</span> <span class="pl-en">fgpid</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>);
+<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-en">getjobpid</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>, <span class="pl-smi">pid_t</span> <span class="pl-s1">pid</span>);
+<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-en">getjobjid</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>, <span class="pl-smi">int</span> <span class="pl-s1">jid</span>);
+<span class="pl-smi">int</span> <span class="pl-en">pid2jid</span>(<span class="pl-smi">pid_t</span> <span class="pl-s1">pid</span>);
+<span class="pl-smi">void</span> <span class="pl-en">listjobs</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>);
+
+<span class="pl-smi">void</span> <span class="pl-en">usage</span>(<span class="pl-smi">void</span>);
+<span class="pl-smi">void</span> <span class="pl-en">unix_error</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">msg</span>);
+<span class="pl-smi">void</span> <span class="pl-en">app_error</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">msg</span>);
+<span class="pl-k">typedef</span> <span class="pl-smi">void</span> <span class="pl-smi">handler_t</span>(<span class="pl-smi">int</span>);
+<span class="pl-smi">handler_t</span> <span class="pl-c1">*</span><span class="pl-en">Signal</span>(<span class="pl-smi">int</span> <span class="pl-s1">signum</span>, <span class="pl-smi">handler_t</span> <span class="pl-c1">*</span><span class="pl-s1">handler</span>);
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * main - The shell's main routine</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">int</span> <span class="pl-en">main</span>(<span class="pl-smi">int</span> <span class="pl-s1">argc</span>, <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-c1">*</span><span class="pl-s1">argv</span>)
+{
+    <span class="pl-smi">char</span> <span class="pl-s1">c</span>;
+    <span class="pl-smi">char</span> <span class="pl-s1">cmdline</span>[<span class="pl-c1">MAXLINE</span>];
+    <span class="pl-smi">int</span> <span class="pl-s1">emit_prompt</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span>; <span class="pl-c">/* emit prompt (default) */</span>
+
+    <span class="pl-c">/* Redirect stderr to stdout (so that driver will get all output</span>
+<span class="pl-c">     * on the pipe connected to stdout) */</span>
+    <span class="pl-en">dup2</span>(<span class="pl-c1">1</span>, <span class="pl-c1">2</span>);
+
+    <span class="pl-c">/* Parse the command line */</span>
+    <span class="pl-k">while</span> ((<span class="pl-s1">c</span> <span class="pl-c1">=</span> <span class="pl-en">getopt</span>(<span class="pl-s1">argc</span>, <span class="pl-s1">argv</span>, <span class="pl-s">"hvp"</span>)) <span class="pl-c1">!=</span> <span class="pl-c1">EOF</span>)
+    {
+        <span class="pl-k">switch</span> (<span class="pl-s1">c</span>)
+        {
+        <span class="pl-k">case</span> <span class="pl-c1">'h'</span>: <span class="pl-c">/* print help message */</span>
+            <span class="pl-en">usage</span>();
+            <span class="pl-k">break</span>;
+        <span class="pl-k">case</span> <span class="pl-c1">'v'</span>: <span class="pl-c">/* emit additional diagnostic info */</span>
+            <span class="pl-s1">verbose</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span>;
+            <span class="pl-k">break</span>;
+        <span class="pl-k">case</span> <span class="pl-c1">'p'</span>:            <span class="pl-c">/* don't print a prompt */</span>
+            <span class="pl-s1">emit_prompt</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-c">/* handy for automatic testing */</span>
+            <span class="pl-k">break</span>;
+        <span class="pl-k">default</span>:
+            <span class="pl-en">usage</span>();
+        }
+    }
+
+    <span class="pl-c">/* Install the signal handlers */</span>
+
+    <span class="pl-c">/* These are the ones you will need to implement */</span>
+    <span class="pl-en">Signal</span>(<span class="pl-c1">SIGINT</span>, <span class="pl-s1">sigint_handler</span>);   <span class="pl-c">/* ctrl-c */</span>
+    <span class="pl-en">Signal</span>(<span class="pl-c1">SIGTSTP</span>, <span class="pl-s1">sigtstp_handler</span>); <span class="pl-c">/* ctrl-z */</span>
+    <span class="pl-en">Signal</span>(<span class="pl-c1">SIGCHLD</span>, <span class="pl-s1">sigchld_handler</span>); <span class="pl-c">/* Terminated or stopped child */</span>
+
+    <span class="pl-c">/* This one provides a clean way to kill the shell */</span>
+    <span class="pl-en">Signal</span>(<span class="pl-c1">SIGQUIT</span>, <span class="pl-s1">sigquit_handler</span>);
+
+    <span class="pl-c">/* Initialize the job list */</span>
+    <span class="pl-en">initjobs</span>(<span class="pl-s1">jobs</span>);
+
+    <span class="pl-c">/* Execute the shell's read/eval loop */</span>
+    <span class="pl-k">while</span> (<span class="pl-c1">1</span>)
+    {
+
+        <span class="pl-c">/* Read command line */</span>
+        <span class="pl-k">if</span> (<span class="pl-s1">emit_prompt</span>)
+        {
+            <span class="pl-en">printf</span>(<span class="pl-s">"%s"</span>, <span class="pl-s1">prompt</span>);
+            <span class="pl-en">fflush</span>(<span class="pl-s1">stdout</span>);
+        }
+        <span class="pl-k">if</span> ((<span class="pl-en">fgets</span>(<span class="pl-s1">cmdline</span>, <span class="pl-c1">MAXLINE</span>, <span class="pl-s1">stdin</span>) <span class="pl-c1">==</span> <span class="pl-c1">NULL</span>) <span class="pl-c1">&amp;&amp;</span> <span class="pl-en">ferror</span>(<span class="pl-s1">stdin</span>))
+            <span class="pl-en">app_error</span>(<span class="pl-s">"fgets error"</span>);
+        <span class="pl-k">if</span> (<span class="pl-en">feof</span>(<span class="pl-s1">stdin</span>))
+        { <span class="pl-c">/* End of file (ctrl-d) */</span>
+            <span class="pl-en">fflush</span>(<span class="pl-s1">stdout</span>);
+            <span class="pl-en">exit</span>(<span class="pl-c1">0</span>);
+        }
+
+        <span class="pl-c">/* Evaluate the command line */</span>
+        <span class="pl-en">eval</span>(<span class="pl-s1">cmdline</span>);
+        <span class="pl-en">fflush</span>(<span class="pl-s1">stdout</span>);
+        <span class="pl-en">fflush</span>(<span class="pl-s1">stdout</span>);
+    }
+
+    <span class="pl-en">exit</span>(<span class="pl-c1">0</span>); <span class="pl-c">/* control never reaches here */</span>
+}
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * eval - Evaluate the command line that the user has just typed in</span>
+<span class="pl-c"> *</span>
+<span class="pl-c"> * If the user has requested a built-in command (quit, jobs, bg or fg)</span>
+<span class="pl-c"> * then execute it immediately. Otherwise, fork a child process and</span>
+<span class="pl-c"> * run the job in the context of the child. If the job is running in</span>
+<span class="pl-c"> * the foreground, wait for it to terminate and then return.  Note:</span>
+<span class="pl-c"> * each child process must have a unique process group ID so that our</span>
+<span class="pl-c"> * background children don't receive SIGINT (SIGTSTP) from the kernel</span>
+<span class="pl-c"> * when we type ctrl-c (ctrl-z) at the keyboard.</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">void</span> <span class="pl-en">eval</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">cmdline</span>)
+{
+    <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">argv</span>[<span class="pl-c1">MAXARGS</span>]; <span class="pl-c">/* argv for execve() */</span>
+    <span class="pl-smi">int</span> <span class="pl-s1">bg</span>;              <span class="pl-c">/* should the job run in bg or fg? */</span>
+    <span class="pl-smi">pid_t</span> <span class="pl-s1">pid</span>;           <span class="pl-c">/* process id */</span>
+    <span class="pl-smi">sigset_t</span> <span class="pl-s1">mask_one</span>, <span class="pl-s1">mask_all</span>, <span class="pl-s1">prev</span>;
+
+    <span class="pl-c">// 设置阻塞信号</span>
+    <span class="pl-en">sigfillset</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">mask_all</span>); <span class="pl-c">// Set all signal bits</span>
+
+    <span class="pl-en">sigemptyset</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">mask_one</span>);        <span class="pl-c">// Clear all signal bits</span>
+    <span class="pl-en">sigaddset</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">mask_one</span>, <span class="pl-c1">SIGCHLD</span>); <span class="pl-c">// Add SIGCHLD signal</span>
+
+    <span class="pl-s1">bg</span> <span class="pl-c1">=</span> <span class="pl-en">parseline</span>(<span class="pl-s1">cmdline</span>, <span class="pl-s1">argv</span>); <span class="pl-c">// Parse command line, formart result into argv</span>
+
+    <span class="pl-k">if</span> (<span class="pl-s1">argv</span>[<span class="pl-c1">0</span>] <span class="pl-c1">==</span> <span class="pl-c1">NULL</span>)
+    {
+        <span class="pl-k">return</span>; <span class="pl-c">// Ignore empty links</span>
+    }
+
+    <span class="pl-k">if</span> (!<span class="pl-en">builtin_cmd</span>(<span class="pl-s1">argv</span>)) <span class="pl-c">// NOT builtin_cmd</span>
+    {
+        <span class="pl-c">/**</span>
+<span class="pl-c">         * Block SIGCHLD, avoid race</span>
+<span class="pl-c">         * Ensure addjob executed before dealing the sigchld</span>
+<span class="pl-c">         *</span>
+<span class="pl-c">         */</span>
+        <span class="pl-en">sigprocmask</span>(<span class="pl-c1">SIG_BLOCK</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">mask_one</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">prev</span>);
+        <span class="pl-k">if</span> ((<span class="pl-s1">pid</span> <span class="pl-c1">=</span> <span class="pl-en">fork</span>()) <span class="pl-c1">==</span> <span class="pl-c1">0</span>)
+        {                                          <span class="pl-c">/* child process */</span>
+            <span class="pl-en">sigprocmask</span>(<span class="pl-c1">SIG_SETMASK</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">prev</span>, <span class="pl-c1">NULL</span>); <span class="pl-c">// Unblock sigchld of children process</span>
+            <span class="pl-en">setpgid</span>(<span class="pl-c1">0</span>, <span class="pl-c1">0</span>);                         <span class="pl-c">// Set unique process group ID</span>
+
+            <span class="pl-c">/* Background jobs should ignore SIGINT (ctrl-c)</span>
+<span class="pl-c">             * and SIGTSTP (ctrl-z) */</span>
+            <span class="pl-k">if</span> (<span class="pl-s1">bg</span>)
+            {
+                <span class="pl-en">Signal</span>(<span class="pl-c1">SIGINT</span>, <span class="pl-c1">SIG_IGN</span>);
+                <span class="pl-en">Signal</span>(<span class="pl-c1">SIGTSTP</span>, <span class="pl-c1">SIG_IGN</span>);
+            }
+            <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">path</span> <span class="pl-c1">=</span> <span class="pl-s1">argv</span>[<span class="pl-c1">0</span>];
+            <span class="pl-k">if</span> (<span class="pl-en">execve</span>(<span class="pl-s1">path</span>, <span class="pl-s1">argv</span>, <span class="pl-s1">environ</span>) <span class="pl-c1">&lt;</span> <span class="pl-c1">0</span>)
+            {
+                <span class="pl-en">sigprocmask</span>(<span class="pl-c1">SIG_BLOCK</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">mask_all</span>, <span class="pl-c1">NULL</span>);
+                <span class="pl-en">printf</span>(<span class="pl-s">"%s: Command not found.\n"</span>, <span class="pl-s1">path</span>);
+                <span class="pl-en">sigprocmask</span>(<span class="pl-c1">SIG_SETMASK</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">prev</span>, <span class="pl-c1">NULL</span>);
+                <span class="pl-en">fflush</span>(<span class="pl-s1">stdout</span>);
+            }
+            <span class="pl-en">exit</span>(<span class="pl-c1">0</span>);
+        }
+        <span class="pl-c">// Setting all signal bits is blocked, guarantee addjob executed</span>
+        <span class="pl-en">sigprocmask</span>(<span class="pl-c1">SIG_BLOCK</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">mask_all</span>, <span class="pl-c1">NULL</span>);
+        <span class="pl-en">addjob</span>(<span class="pl-s1">jobs</span>, <span class="pl-s1">pid</span>, (<span class="pl-s1">bg</span> <span class="pl-c1">==</span> <span class="pl-c1">1</span> ? <span class="pl-c1">BG</span> : <span class="pl-c1">FG</span>), <span class="pl-s1">cmdline</span>);
+        <span class="pl-en">sigprocmask</span>(<span class="pl-c1">SIG_SETMASK</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">mask_one</span>, <span class="pl-c1">NULL</span>);
+        <span class="pl-k">if</span> (<span class="pl-s1">bg</span> <span class="pl-c1">==</span> <span class="pl-c1">1</span>)
+        {
+            <span class="pl-en">printf</span>(<span class="pl-s">"[%d] (%d) %s"</span>, <span class="pl-en">pid2jid</span>(<span class="pl-s1">pid</span>), <span class="pl-s1">pid</span>, <span class="pl-s1">cmdline</span>);
+        }
+        <span class="pl-k">else</span>
+        {
+            <span class="pl-en">waitfg</span>(<span class="pl-s1">pid</span>);
+        }
+        <span class="pl-en">sigprocmask</span>(<span class="pl-c1">SIG_SETMASK</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">prev</span>, <span class="pl-c1">NULL</span>); <span class="pl-c">// Unmask all bits</span>
+    }
+    <span class="pl-k">return</span>;
+}
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * parseline - Parse the command line and build the argv array.</span>
+<span class="pl-c"> *</span>
+<span class="pl-c"> * Characters enclosed in single quotes are treated as a single</span>
+<span class="pl-c"> * argument.  Return true if the user has requested a BG job, false if</span>
+<span class="pl-c"> * the user has requested a FG job.</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">int</span> <span class="pl-en">parseline</span>(<span class="pl-k">const</span> <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">cmdline</span>, <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-c1">*</span><span class="pl-s1">argv</span>)
+{
+    <span class="pl-k">static</span> <span class="pl-smi">char</span> <span class="pl-s1">array</span>[<span class="pl-c1">MAXLINE</span>]; <span class="pl-c">/* holds local copy of command line */</span>
+    <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">buf</span> <span class="pl-c1">=</span> <span class="pl-s1">array</span>;          <span class="pl-c">/* ptr that traverses command line */</span>
+    <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">delim</span>;                <span class="pl-c">/* points to first space delimiter */</span>
+    <span class="pl-smi">int</span> <span class="pl-s1">argc</span>;                   <span class="pl-c">/* number of args */</span>
+    <span class="pl-smi">int</span> <span class="pl-s1">bg</span>;                     <span class="pl-c">/* background job? */</span>
+
+    <span class="pl-en">strcpy</span>(<span class="pl-s1">buf</span>, <span class="pl-s1">cmdline</span>);
+    <span class="pl-s1">buf</span>[<span class="pl-en">strlen</span>(<span class="pl-s1">buf</span>) <span class="pl-c1">-</span> <span class="pl-c1">1</span>] <span class="pl-c1">=</span> <span class="pl-c1">' '</span>;   <span class="pl-c">/* replace trailing '\n' with space */</span>
+    <span class="pl-k">while</span> (<span class="pl-c1">*</span><span class="pl-s1">buf</span> <span class="pl-c1">&amp;&amp;</span> (<span class="pl-c1">*</span><span class="pl-s1">buf</span> <span class="pl-c1">==</span> <span class="pl-c1">' '</span>)) <span class="pl-c">/* ignore leading spaces */</span>
+        <span class="pl-s1">buf</span><span class="pl-c1">++</span>;
+
+    <span class="pl-c">/* Build the argv list */</span>
+    <span class="pl-s1">argc</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>;
+    <span class="pl-k">if</span> (<span class="pl-c1">*</span><span class="pl-s1">buf</span> <span class="pl-c1">==</span> <span class="pl-c1">'\''</span>)
+    {
+        <span class="pl-s1">buf</span><span class="pl-c1">++</span>;
+        <span class="pl-s1">delim</span> <span class="pl-c1">=</span> <span class="pl-en">strchr</span>(<span class="pl-s1">buf</span>, <span class="pl-c1">'\''</span>);
+    }
+    <span class="pl-k">else</span>
+    {
+        <span class="pl-s1">delim</span> <span class="pl-c1">=</span> <span class="pl-en">strchr</span>(<span class="pl-s1">buf</span>, <span class="pl-c1">' '</span>);
+    }
+
+    <span class="pl-k">while</span> (<span class="pl-s1">delim</span>)
+    {
+        <span class="pl-s1">argv</span>[<span class="pl-s1">argc</span><span class="pl-c1">++</span>] <span class="pl-c1">=</span> <span class="pl-s1">buf</span>;
+        <span class="pl-c1">*</span><span class="pl-s1">delim</span> <span class="pl-c1">=</span> <span class="pl-c1">'\0'</span>;
+        <span class="pl-s1">buf</span> <span class="pl-c1">=</span> <span class="pl-s1">delim</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>;
+        <span class="pl-k">while</span> (<span class="pl-c1">*</span><span class="pl-s1">buf</span> <span class="pl-c1">&amp;&amp;</span> (<span class="pl-c1">*</span><span class="pl-s1">buf</span> <span class="pl-c1">==</span> <span class="pl-c1">' '</span>)) <span class="pl-c">/* ignore spaces */</span>
+            <span class="pl-s1">buf</span><span class="pl-c1">++</span>;
+
+        <span class="pl-k">if</span> (<span class="pl-c1">*</span><span class="pl-s1">buf</span> <span class="pl-c1">==</span> <span class="pl-c1">'\''</span>)
+        {
+            <span class="pl-s1">buf</span><span class="pl-c1">++</span>;
+            <span class="pl-s1">delim</span> <span class="pl-c1">=</span> <span class="pl-en">strchr</span>(<span class="pl-s1">buf</span>, <span class="pl-c1">'\''</span>);
+        }
+        <span class="pl-k">else</span>
+        {
+            <span class="pl-s1">delim</span> <span class="pl-c1">=</span> <span class="pl-en">strchr</span>(<span class="pl-s1">buf</span>, <span class="pl-c1">' '</span>);
+        }
+    }
+    <span class="pl-s1">argv</span>[<span class="pl-s1">argc</span>] <span class="pl-c1">=</span> <span class="pl-c1">NULL</span>;
+
+    <span class="pl-k">if</span> (<span class="pl-s1">argc</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span>) <span class="pl-c">/* ignore blank line */</span>
+        <span class="pl-k">return</span> <span class="pl-c1">1</span>;
+
+    <span class="pl-c">/* should the job run in the background? */</span>
+    <span class="pl-k">if</span> ((<span class="pl-s1">bg</span> <span class="pl-c1">=</span> (<span class="pl-c1">*</span><span class="pl-s1">argv</span>[<span class="pl-s1">argc</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span>] <span class="pl-c1">==</span> <span class="pl-c1">'&amp;'</span>)) <span class="pl-c1">!=</span> <span class="pl-c1">0</span>)
+    {
+        <span class="pl-s1">argv</span>[<span class="pl-c1">--</span><span class="pl-s1">argc</span>] <span class="pl-c1">=</span> <span class="pl-c1">NULL</span>;
+    }
+    <span class="pl-k">return</span> <span class="pl-s1">bg</span>;
+}
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * builtin_cmd - If the user has typed a built-in command then execute</span>
+<span class="pl-c"> *    it immediately.</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">int</span> <span class="pl-en">builtin_cmd</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-c1">*</span><span class="pl-s1">argv</span>)
+{
+    <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">cmd</span> <span class="pl-c1">=</span> <span class="pl-s1">argv</span>[<span class="pl-c1">0</span>];
+    <span class="pl-k">if</span> (<span class="pl-en">strcmp</span>(<span class="pl-s1">cmd</span>, <span class="pl-s">"quit"</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span>)
+        <span class="pl-en">exit</span>(<span class="pl-c1">0</span>); <span class="pl-c">/* terminate shell */</span>
+    <span class="pl-k">else</span> <span class="pl-k">if</span> (<span class="pl-en">strcmp</span>(<span class="pl-s1">cmd</span>, <span class="pl-s">"jobs"</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span>)
+    {
+        <span class="pl-en">listjobs</span>(<span class="pl-s1">jobs</span>);
+        <span class="pl-k">return</span> <span class="pl-c1">1</span>;
+    }
+    <span class="pl-k">else</span> <span class="pl-k">if</span> (<span class="pl-en">strcmp</span>(<span class="pl-s1">cmd</span>, <span class="pl-s">"bg"</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span> <span class="pl-c1">||</span> <span class="pl-en">strcmp</span>(<span class="pl-s1">cmd</span>, <span class="pl-s">"fg"</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span>)
+    {
+        <span class="pl-en">do_bgfg</span>(<span class="pl-s1">argv</span>);
+        <span class="pl-k">return</span> <span class="pl-c1">1</span>;
+    }
+    <span class="pl-k">else</span> <span class="pl-k">if</span> (<span class="pl-en">strcmp</span>(<span class="pl-s1">argv</span>[<span class="pl-c1">0</span>], <span class="pl-s">"&amp;"</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span>)
+    {
+        <span class="pl-k">return</span> <span class="pl-c1">1</span>;
+    }
+    <span class="pl-k">return</span> <span class="pl-c1">0</span>; <span class="pl-c">/* not a builtin command */</span>
+}
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * do_bgfg - Execute the builtin bg and fg commands</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">void</span> <span class="pl-en">do_bgfg</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-c1">*</span><span class="pl-s1">argv</span>)
+{
+    <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">cmd</span> <span class="pl-c1">=</span> <span class="pl-s1">argv</span>[<span class="pl-c1">0</span>];
+    <span class="pl-k">if</span> (<span class="pl-s1">argv</span>[<span class="pl-c1">1</span>] <span class="pl-c1">==</span> <span class="pl-c1">NULL</span>)
+    {
+        <span class="pl-en">printf</span>(<span class="pl-s">"%s command requires PID or %%jobid argument\n"</span>, <span class="pl-s1">cmd</span>);
+        <span class="pl-k">return</span>;
+    }
+    <span class="pl-smi">int</span> <span class="pl-s1">id</span>;
+    <span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">ptr</span>;
+    <span class="pl-k">if</span> (<span class="pl-s1">argv</span>[<span class="pl-c1">1</span>][<span class="pl-c1">0</span>] <span class="pl-c1">==</span> <span class="pl-c1">'%'</span>)
+    {
+        <span class="pl-k">if</span> ((<span class="pl-s1">id</span> <span class="pl-c1">=</span> <span class="pl-en">atoi</span>(<span class="pl-s1">argv</span>[<span class="pl-c1">1</span>] <span class="pl-c1">+</span> <span class="pl-c1">1</span>)) <span class="pl-c1">==</span> <span class="pl-c1">0</span>)
+        {
+            <span class="pl-en">printf</span>(<span class="pl-s">"%s: argument must be a PID or %%jobid\n"</span>, <span class="pl-s1">cmd</span>);
+            <span class="pl-k">return</span>;
+        }
+        <span class="pl-k">if</span> ((<span class="pl-s1">ptr</span> <span class="pl-c1">=</span> <span class="pl-en">getjobjid</span>(<span class="pl-s1">jobs</span>, <span class="pl-s1">id</span>)) <span class="pl-c1">==</span> <span class="pl-c1">NULL</span>)
+        {
+            <span class="pl-en">printf</span>(<span class="pl-s">"%%%d: No such job\n"</span>, <span class="pl-s1">id</span>);
+            <span class="pl-k">return</span>;
+        }
+    }
+    <span class="pl-k">else</span>
+    {
+
+        <span class="pl-k">if</span> ((<span class="pl-s1">id</span> <span class="pl-c1">=</span> <span class="pl-en">atoi</span>(<span class="pl-s1">argv</span>[<span class="pl-c1">1</span>])) <span class="pl-c1">==</span> <span class="pl-c1">0</span>)
+        {
+            <span class="pl-en">printf</span>(<span class="pl-s">"%s: argument must be a PID or %%jobid\n"</span>, <span class="pl-s1">cmd</span>);
+            <span class="pl-k">return</span>;
+        }
+        <span class="pl-k">if</span> ((<span class="pl-s1">ptr</span> <span class="pl-c1">=</span> <span class="pl-en">getjobpid</span>(<span class="pl-s1">jobs</span>, <span class="pl-s1">id</span>)) <span class="pl-c1">==</span> <span class="pl-c1">NULL</span>)
+        {
+            <span class="pl-en">printf</span>(<span class="pl-s">"(%d) : No such process\n"</span>, <span class="pl-s1">id</span>);
+            <span class="pl-k">return</span>;
+        }
+    }
+    <span class="pl-c">// 如果 pid &lt; -1，则信号 sig 将发送给进程组 ID 等于 pid 的所有进程。</span>
+    <span class="pl-k">if</span> (<span class="pl-en">strcmp</span>(<span class="pl-s1">cmd</span>, <span class="pl-s">"bg"</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span>)
+    {
+        <span class="pl-en">printf</span>(<span class="pl-s">"[%d] (%d) %s"</span>, <span class="pl-s1">ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">jid</span>, <span class="pl-s1">ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">pid</span>, <span class="pl-s1">ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">cmdline</span>);
+        <span class="pl-s1">ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">state</span> <span class="pl-c1">=</span> <span class="pl-c1">BG</span>;
+        <span class="pl-en">kill</span>(<span class="pl-c1">-</span>(<span class="pl-s1">ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">pid</span>), <span class="pl-c1">SIGCONT</span>);
+    }
+    <span class="pl-k">else</span> <span class="pl-k">if</span> (<span class="pl-en">strcmp</span>(<span class="pl-s1">argv</span>[<span class="pl-c1">0</span>], <span class="pl-s">"fg"</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span>)
+    {
+        <span class="pl-s1">ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">state</span> <span class="pl-c1">=</span> <span class="pl-c1">FG</span>;
+        <span class="pl-en">kill</span>(<span class="pl-c1">-</span><span class="pl-s1">ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">pid</span>, <span class="pl-c1">SIGCONT</span>);
+        <span class="pl-en">waitfg</span>(<span class="pl-s1">ptr</span><span class="pl-c1">-&gt;</span><span class="pl-c1">pid</span>);
+    }
+    <span class="pl-k">return</span>;
+}
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * waitfg - Block until process pid is no longer the foreground process</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">void</span> <span class="pl-en">waitfg</span>(<span class="pl-smi">pid_t</span> <span class="pl-s1">pid</span>)
+{
+    <span class="pl-smi">sigset_t</span> <span class="pl-s1">prev</span>;
+    <span class="pl-en">sigemptyset</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">prev</span>);
+    <span class="pl-k">while</span> (<span class="pl-en">fgpid</span>(<span class="pl-s1">jobs</span>))
+    {
+        <span class="pl-en">sigsuspend</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">prev</span>);
+    }
+    <span class="pl-k">return</span>;
+}
+
+<span class="pl-c">/*****************</span>
+<span class="pl-c"> * Signal handlers</span>
+<span class="pl-c"> *****************/</span>
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * sigchld_handler - The kernel sends a SIGCHLD to the shell whenever</span>
+<span class="pl-c"> *     a child job terminates (becomes a zombie), or stops because it</span>
+<span class="pl-c"> *     received a SIGSTOP or SIGTSTP signal. The handler reaps all</span>
+<span class="pl-c"> *     available zombie children, but doesn't wait for any other</span>
+<span class="pl-c"> *     currently running children to terminate.</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">void</span> <span class="pl-en">sigchld_handler</span>(<span class="pl-smi">int</span> <span class="pl-s1">sig</span>)
+{
+    <span class="pl-smi">int</span> <span class="pl-s1">old_errno</span> <span class="pl-c1">=</span> <span class="pl-s1">errno</span>;
+    <span class="pl-smi">pid_t</span> <span class="pl-s1">pid</span>;
+    <span class="pl-smi">int</span> <span class="pl-s1">status</span>;
+    <span class="pl-smi">sigset_t</span> <span class="pl-s1">prev_all</span>, <span class="pl-s1">mask_all</span>;
+    <span class="pl-en">sigfillset</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">mask_all</span>);
+    <span class="pl-c">/**</span>
+<span class="pl-c">     *  WNOHANG: 如果等待集中的子进程均未终止，则立即返回（返回值为 0）</span>
+<span class="pl-c">     *  默认行为是暂停调用进程，直到子进程终止；</span>
+<span class="pl-c">     *  */</span>
+    <span class="pl-k">while</span> ((<span class="pl-s1">pid</span> <span class="pl-c1">=</span> <span class="pl-en">waitpid</span>(<span class="pl-c1">-1</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">status</span>, <span class="pl-c1">WNOHANG</span> | <span class="pl-c1">WUNTRACED</span>)) <span class="pl-c1">&gt;</span> <span class="pl-c1">0</span>)
+    {
+        <span class="pl-en">sigprocmask</span>(<span class="pl-c1">SIG_BLOCK</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">mask_all</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">prev_all</span>);
+        <span class="pl-k">if</span> (<span class="pl-en">WIFEXITED</span>(<span class="pl-s1">status</span>))
+        {
+            <span class="pl-en">deletejob</span>(<span class="pl-s1">jobs</span>, <span class="pl-s1">pid</span>);
+        }
+        <span class="pl-k">else</span> <span class="pl-k">if</span> (<span class="pl-en">WIFSTOPPED</span>(<span class="pl-s1">status</span>))
+        {
+            <span class="pl-en">printf</span>(<span class="pl-s">"Job [%d] (%d) stoped by signal %d\n"</span>, <span class="pl-en">pid2jid</span>(<span class="pl-s1">pid</span>), <span class="pl-s1">pid</span>, <span class="pl-en">WSTOPSIG</span>(<span class="pl-s1">status</span>));
+            <span class="pl-en">getjobpid</span>(<span class="pl-s1">jobs</span>, <span class="pl-s1">pid</span>)<span class="pl-c1">-&gt;</span><span class="pl-c1">state</span> <span class="pl-c1">=</span> <span class="pl-c1">ST</span>;
+        }
+        <span class="pl-k">else</span> <span class="pl-k">if</span> (<span class="pl-en">WIFSIGNALED</span>(<span class="pl-s1">status</span>))
+        {
+            <span class="pl-en">printf</span>(<span class="pl-s">"Job [%d] (%d) terminated by signal %d\n"</span>, <span class="pl-en">pid2jid</span>(<span class="pl-s1">pid</span>), <span class="pl-s1">pid</span>, <span class="pl-en">WTERMSIG</span>(<span class="pl-s1">status</span>));
+            <span class="pl-en">deletejob</span>(<span class="pl-s1">jobs</span>, <span class="pl-s1">pid</span>);
+        }
+        <span class="pl-en">sigprocmask</span>(<span class="pl-c1">SIG_SETMASK</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">prev_all</span>, <span class="pl-c1">NULL</span>);
+    }
+    <span class="pl-s1">errno</span> <span class="pl-c1">=</span> <span class="pl-s1">old_errno</span>;
+    <span class="pl-k">return</span>;
+}
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * sigint_handler - The kernel sends a SIGINT to the shell whenver the</span>
+<span class="pl-c"> *    user types ctrl-c at the keyboard.  Catch it and send it along</span>
+<span class="pl-c"> *    to the foreground job.</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">void</span> <span class="pl-en">sigint_handler</span>(<span class="pl-smi">int</span> <span class="pl-s1">sig</span>)
+{
+    <span class="pl-smi">int</span> <span class="pl-s1">olderrno</span> <span class="pl-c1">=</span> <span class="pl-s1">errno</span>;
+    <span class="pl-smi">int</span> <span class="pl-s1">pid</span>;
+    <span class="pl-smi">sigset_t</span> <span class="pl-s1">mask_all</span>, <span class="pl-s1">prev_all</span>;
+    <span class="pl-en">sigfillset</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">mask_all</span>);
+    <span class="pl-en">sigprocmask</span>(<span class="pl-c1">SIG_BLOCK</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">mask_all</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">prev_all</span>);
+    <span class="pl-k">if</span> ((<span class="pl-s1">pid</span> <span class="pl-c1">=</span> <span class="pl-en">fgpid</span>(<span class="pl-s1">jobs</span>)) <span class="pl-c1">!=</span> <span class="pl-c1">0</span>) {
+        <span class="pl-en">sigprocmask</span>(<span class="pl-c1">SIG_SETMASK</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">prev_all</span>, <span class="pl-c1">NULL</span>);
+        <span class="pl-en">kill</span>(<span class="pl-c1">-</span><span class="pl-s1">pid</span>, <span class="pl-c1">SIGINT</span>);
+    }
+    <span class="pl-s1">errno</span> <span class="pl-c1">=</span> <span class="pl-s1">olderrno</span>;
+    <span class="pl-k">return</span>;
+}
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * sigtstp_handler - The kernel sends a SIGTSTP to the shell whenever</span>
+<span class="pl-c"> *     the user types ctrl-z at the keyboard. Catch it and suspend the</span>
+<span class="pl-c"> *     foreground job by sending it a SIGTSTP.</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">void</span> <span class="pl-en">sigtstp_handler</span>(<span class="pl-smi">int</span> <span class="pl-s1">sig</span>)
+{
+    <span class="pl-smi">int</span> <span class="pl-s1">olderrno</span> <span class="pl-c1">=</span> <span class="pl-s1">errno</span>;
+    <span class="pl-smi">sigset_t</span> <span class="pl-s1">mask_all</span>, <span class="pl-s1">prev_all</span>;
+    <span class="pl-smi">int</span> <span class="pl-s1">pid</span>;
+    <span class="pl-en">sigfillset</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">mask_all</span>);
+    <span class="pl-en">sigprocmask</span>(<span class="pl-c1">SIG_BLOCK</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">mask_all</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">prev_all</span>);
+    <span class="pl-k">if</span> ((<span class="pl-s1">pid</span> <span class="pl-c1">=</span> <span class="pl-en">fgpid</span>(<span class="pl-s1">jobs</span>)) <span class="pl-c1">&gt;</span> <span class="pl-c1">0</span>) {
+        <span class="pl-en">sigprocmask</span>(<span class="pl-c1">SIG_SETMASK</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">prev_all</span>, <span class="pl-c1">NULL</span>);
+        <span class="pl-en">kill</span>(<span class="pl-c1">-</span><span class="pl-s1">pid</span>, <span class="pl-c1">SIGSTOP</span>);
+    }
+    <span class="pl-s1">errno</span> <span class="pl-c1">=</span> <span class="pl-s1">olderrno</span>;
+    <span class="pl-k">return</span>;
+}
+
+<span class="pl-c">/*********************</span>
+<span class="pl-c"> * End signal handlers</span>
+<span class="pl-c"> *********************/</span>
+
+<span class="pl-c">/***********************************************</span>
+<span class="pl-c"> * Helper routines that manipulate the job list</span>
+<span class="pl-c"> **********************************************/</span>
+
+<span class="pl-c">/* clearjob - Clear the entries in a job struct */</span>
+<span class="pl-smi">void</span> <span class="pl-en">clearjob</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">job</span>)
+{
+    <span class="pl-s1">job</span><span class="pl-c1">-&gt;</span><span class="pl-c1">pid</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>;
+    <span class="pl-s1">job</span><span class="pl-c1">-&gt;</span><span class="pl-c1">jid</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>;
+    <span class="pl-s1">job</span><span class="pl-c1">-&gt;</span><span class="pl-c1">state</span> <span class="pl-c1">=</span> <span class="pl-c1">UNDEF</span>;
+    <span class="pl-s1">job</span><span class="pl-c1">-&gt;</span><span class="pl-c1">cmdline</span>[<span class="pl-c1">0</span>] <span class="pl-c1">=</span> <span class="pl-c1">'\0'</span>;
+}
+
+<span class="pl-c">/* initjobs - Initialize the job list */</span>
+<span class="pl-smi">void</span> <span class="pl-en">initjobs</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>)
+{
+    <span class="pl-smi">int</span> <span class="pl-s1">i</span>;
+
+    <span class="pl-k">for</span> (<span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">MAXJOBS</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+        <span class="pl-en">clearjob</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>]);
+}
+
+<span class="pl-c">/* maxjid - Returns largest allocated job ID */</span>
+<span class="pl-smi">int</span> <span class="pl-en">maxjid</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>)
+{
+    <span class="pl-smi">int</span> <span class="pl-s1">i</span>, <span class="pl-s1">max</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>;
+
+    <span class="pl-k">for</span> (<span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">MAXJOBS</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+        <span class="pl-k">if</span> (<span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">jid</span> <span class="pl-c1">&gt;</span> <span class="pl-s1">max</span>)
+            <span class="pl-s1">max</span> <span class="pl-c1">=</span> <span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">jid</span>;
+    <span class="pl-k">return</span> <span class="pl-s1">max</span>;
+}
+
+<span class="pl-c">/* addjob - Add a job to the job list */</span>
+<span class="pl-smi">int</span> <span class="pl-en">addjob</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>, <span class="pl-smi">pid_t</span> <span class="pl-s1">pid</span>, <span class="pl-smi">int</span> <span class="pl-s1">state</span>, <span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">cmdline</span>)
+{
+    <span class="pl-smi">int</span> <span class="pl-s1">i</span>;
+
+    <span class="pl-k">if</span> (<span class="pl-s1">pid</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">1</span>)
+        <span class="pl-k">return</span> <span class="pl-c1">0</span>;
+
+    <span class="pl-k">for</span> (<span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">MAXJOBS</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+    {
+        <span class="pl-k">if</span> (<span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">pid</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span>)
+        {
+            <span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">pid</span> <span class="pl-c1">=</span> <span class="pl-s1">pid</span>;
+            <span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">state</span> <span class="pl-c1">=</span> <span class="pl-s1">state</span>;
+            <span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">jid</span> <span class="pl-c1">=</span> <span class="pl-s1">nextjid</span><span class="pl-c1">++</span>;
+            <span class="pl-k">if</span> (<span class="pl-s1">nextjid</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">MAXJOBS</span>)
+                <span class="pl-s1">nextjid</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span>;
+            <span class="pl-en">strcpy</span>(<span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">cmdline</span>, <span class="pl-s1">cmdline</span>);
+            <span class="pl-k">if</span> (<span class="pl-s1">verbose</span>)
+            {
+                <span class="pl-en">printf</span>(<span class="pl-s">"Added job [%d] %d %s\n"</span>, <span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">jid</span>, <span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">pid</span>, <span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">cmdline</span>);
+            }
+            <span class="pl-k">return</span> <span class="pl-c1">1</span>;
+        }
+    }
+    <span class="pl-en">printf</span>(<span class="pl-s">"Tried to create too many jobs\n"</span>);
+    <span class="pl-k">return</span> <span class="pl-c1">0</span>;
+}
+
+<span class="pl-c">/* deletejob - Delete a job whose PID=pid from the job list */</span>
+<span class="pl-smi">int</span> <span class="pl-en">deletejob</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>, <span class="pl-smi">pid_t</span> <span class="pl-s1">pid</span>)
+{
+    <span class="pl-smi">int</span> <span class="pl-s1">i</span>;
+
+    <span class="pl-k">if</span> (<span class="pl-s1">pid</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">1</span>)
+        <span class="pl-k">return</span> <span class="pl-c1">0</span>;
+
+    <span class="pl-k">for</span> (<span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">MAXJOBS</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+    {
+        <span class="pl-k">if</span> (<span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">pid</span> <span class="pl-c1">==</span> <span class="pl-s1">pid</span>)
+        {
+            <span class="pl-en">clearjob</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>]);
+            <span class="pl-s1">nextjid</span> <span class="pl-c1">=</span> <span class="pl-en">maxjid</span>(<span class="pl-s1">jobs</span>) <span class="pl-c1">+</span> <span class="pl-c1">1</span>;
+            <span class="pl-k">return</span> <span class="pl-c1">1</span>;
+        }
+    }
+    <span class="pl-k">return</span> <span class="pl-c1">0</span>;
+}
+
+<span class="pl-c">/* fgpid - Return PID of current foreground job, 0 if no such job */</span>
+<span class="pl-smi">pid_t</span> <span class="pl-en">fgpid</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>)
+{
+    <span class="pl-smi">int</span> <span class="pl-s1">i</span>;
+
+    <span class="pl-k">for</span> (<span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">MAXJOBS</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+        <span class="pl-k">if</span> (<span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">state</span> <span class="pl-c1">==</span> <span class="pl-c1">FG</span>)
+            <span class="pl-k">return</span> <span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">pid</span>;
+    <span class="pl-k">return</span> <span class="pl-c1">0</span>;
+}
+
+<span class="pl-c">/* getjobpid  - Find a job (by PID) on the job list */</span>
+<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-en">getjobpid</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>, <span class="pl-smi">pid_t</span> <span class="pl-s1">pid</span>)
+{
+    <span class="pl-smi">int</span> <span class="pl-s1">i</span>;
+
+    <span class="pl-k">if</span> (<span class="pl-s1">pid</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">1</span>)
+        <span class="pl-k">return</span> <span class="pl-c1">NULL</span>;
+    <span class="pl-k">for</span> (<span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">MAXJOBS</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+        <span class="pl-k">if</span> (<span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">pid</span> <span class="pl-c1">==</span> <span class="pl-s1">pid</span>)
+            <span class="pl-k">return</span> <span class="pl-c1">&amp;</span><span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>];
+    <span class="pl-k">return</span> <span class="pl-c1">NULL</span>;
+}
+
+<span class="pl-c">/* getjobjid  - Find a job (by JID) on the job list */</span>
+<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-en">getjobjid</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>, <span class="pl-smi">int</span> <span class="pl-s1">jid</span>)
+{
+    <span class="pl-smi">int</span> <span class="pl-s1">i</span>;
+
+    <span class="pl-k">if</span> (<span class="pl-s1">jid</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">1</span>)
+        <span class="pl-k">return</span> <span class="pl-c1">NULL</span>;
+    <span class="pl-k">for</span> (<span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">MAXJOBS</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+        <span class="pl-k">if</span> (<span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">jid</span> <span class="pl-c1">==</span> <span class="pl-s1">jid</span>)
+            <span class="pl-k">return</span> <span class="pl-c1">&amp;</span><span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>];
+    <span class="pl-k">return</span> <span class="pl-c1">NULL</span>;
+}
+
+<span class="pl-c">/* pid2jid - Map process ID to job ID */</span>
+<span class="pl-smi">int</span> <span class="pl-en">pid2jid</span>(<span class="pl-smi">pid_t</span> <span class="pl-s1">pid</span>)
+{
+    <span class="pl-smi">int</span> <span class="pl-s1">i</span>;
+
+    <span class="pl-k">if</span> (<span class="pl-s1">pid</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">1</span>)
+        <span class="pl-k">return</span> <span class="pl-c1">0</span>;
+    <span class="pl-k">for</span> (<span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">MAXJOBS</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+        <span class="pl-k">if</span> (<span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">pid</span> <span class="pl-c1">==</span> <span class="pl-s1">pid</span>)
+        {
+            <span class="pl-k">return</span> <span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">jid</span>;
+        }
+    <span class="pl-k">return</span> <span class="pl-c1">0</span>;
+}
+
+<span class="pl-c">/* listjobs - Print the job list */</span>
+<span class="pl-smi">void</span> <span class="pl-en">listjobs</span>(<span class="pl-k">struct</span> <span class="pl-smi">job_t</span> <span class="pl-c1">*</span><span class="pl-s1">jobs</span>)
+{
+    <span class="pl-smi">int</span> <span class="pl-s1">i</span>;
+
+    <span class="pl-k">for</span> (<span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>; <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">MAXJOBS</span>; <span class="pl-s1">i</span><span class="pl-c1">++</span>)
+    {
+        <span class="pl-k">if</span> (<span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">pid</span> <span class="pl-c1">!=</span> <span class="pl-c1">0</span>)
+        {
+            <span class="pl-en">printf</span>(<span class="pl-s">"[%d] (%d) "</span>, <span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">jid</span>, <span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">pid</span>);
+            <span class="pl-k">switch</span> (<span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">state</span>)
+            {
+            <span class="pl-k">case</span> <span class="pl-c1">BG</span>:
+                <span class="pl-en">printf</span>(<span class="pl-s">"Running "</span>);
+                <span class="pl-k">break</span>;
+            <span class="pl-k">case</span> <span class="pl-c1">FG</span>:
+                <span class="pl-en">printf</span>(<span class="pl-s">"Foreground "</span>);
+                <span class="pl-k">break</span>;
+            <span class="pl-k">case</span> <span class="pl-c1">ST</span>:
+                <span class="pl-en">printf</span>(<span class="pl-s">"Stopped "</span>);
+                <span class="pl-k">break</span>;
+            <span class="pl-k">default</span>:
+                <span class="pl-en">printf</span>(<span class="pl-s">"listjobs: Internal error: job[%d].state=%d "</span>,
+                       <span class="pl-s1">i</span>, <span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">state</span>);
+            }
+            <span class="pl-en">printf</span>(<span class="pl-s">"%s"</span>, <span class="pl-s1">jobs</span>[<span class="pl-s1">i</span>].<span class="pl-c1">cmdline</span>);
+        }
+    }
+}
+<span class="pl-c">/******************************</span>
+<span class="pl-c"> * end job list helper routines</span>
+<span class="pl-c"> ******************************/</span>
+
+<span class="pl-c">/***********************</span>
+<span class="pl-c"> * Other helper routines</span>
+<span class="pl-c"> ***********************/</span>
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * usage - print a help message</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">void</span> <span class="pl-en">usage</span>(<span class="pl-smi">void</span>)
+{
+    <span class="pl-en">printf</span>(<span class="pl-s">"Usage: shell [-hvp]\n"</span>);
+    <span class="pl-en">printf</span>(<span class="pl-s">"   -h   print this message\n"</span>);
+    <span class="pl-en">printf</span>(<span class="pl-s">"   -v   print additional diagnostic information\n"</span>);
+    <span class="pl-en">printf</span>(<span class="pl-s">"   -p   do not emit a command prompt\n"</span>);
+    <span class="pl-en">exit</span>(<span class="pl-c1">1</span>);
+}
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * unix_error - unix-style error routine</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">void</span> <span class="pl-en">unix_error</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">msg</span>)
+{
+    <span class="pl-en">fprintf</span>(<span class="pl-s1">stdout</span>, <span class="pl-s">"%s: %s\n"</span>, <span class="pl-s1">msg</span>, <span class="pl-en">strerror</span>(<span class="pl-s1">errno</span>));
+    <span class="pl-en">exit</span>(<span class="pl-c1">1</span>);
+}
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * app_error - application-style error routine</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">void</span> <span class="pl-en">app_error</span>(<span class="pl-smi">char</span> <span class="pl-c1">*</span><span class="pl-s1">msg</span>)
+{
+    <span class="pl-en">fprintf</span>(<span class="pl-s1">stdout</span>, <span class="pl-s">"%s\n"</span>, <span class="pl-s1">msg</span>);
+    <span class="pl-en">exit</span>(<span class="pl-c1">1</span>);
+}
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * Signal - wrapper for the sigaction function</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">handler_t</span> <span class="pl-c1">*</span><span class="pl-en">Signal</span>(<span class="pl-smi">int</span> <span class="pl-s1">signum</span>, <span class="pl-smi">handler_t</span> <span class="pl-c1">*</span><span class="pl-s1">handler</span>)
+{
+    <span class="pl-k">struct</span> <span class="pl-smi">sigaction</span> <span class="pl-s1">action</span>, <span class="pl-s1">old_action</span>;
+
+    <span class="pl-s1">action</span>.<span class="pl-c1">sa_handler</span> <span class="pl-c1">=</span> <span class="pl-s1">handler</span>;
+    <span class="pl-en">sigemptyset</span>(<span class="pl-c1">&amp;</span><span class="pl-s1">action</span>.<span class="pl-c1">sa_mask</span>); <span class="pl-c">/* block sigs of type being handled */</span>
+    <span class="pl-s1">action</span>.<span class="pl-c1">sa_flags</span> <span class="pl-c1">=</span> <span class="pl-c1">SA_RESTART</span>; <span class="pl-c">/* restart syscalls if possible */</span>
+
+    <span class="pl-k">if</span> (<span class="pl-en">sigaction</span>(<span class="pl-s1">signum</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">action</span>, <span class="pl-c1">&amp;</span><span class="pl-s1">old_action</span>) <span class="pl-c1">&lt;</span> <span class="pl-c1">0</span>)
+        <span class="pl-en">unix_error</span>(<span class="pl-s">"Signal error"</span>);
+    <span class="pl-k">return</span> (<span class="pl-s1">old_action</span>.<span class="pl-c1">sa_handler</span>);
+}
+
+<span class="pl-c">/*</span>
+<span class="pl-c"> * sigquit_handler - The driver program can gracefully terminate the</span>
+<span class="pl-c"> *    child shell by sending it a SIGQUIT signal.</span>
+<span class="pl-c"> */</span>
+<span class="pl-smi">void</span> <span class="pl-en">sigquit_handler</span>(<span class="pl-smi">int</span> <span class="pl-s1">sig</span>)
+{
+    <span class="pl-en">printf</span>(<span class="pl-s">"Terminating after receipt of SIGQUIT signal\n"</span>);
+    <span class="pl-en">exit</span>(<span class="pl-c1">1</span>);
+}
+</pre></div></div>
 <div style="font-size:small;margin-top:8px;float:right;">转载请注明出处</div>
 
 <button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
@@ -98,7 +1553,7 @@ if(""!=""){
 </script></div>
 </body>
 <script>
-var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z'};
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z', 'copy': 'M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z', 'check': 'M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'};
 var utterancesLoad=0;
 
 let themeSettings={
@@ -171,7 +1626,70 @@ function iFrameLoading(){
     }
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+    const createClipboardHTML = (codeContent, additionalClasses = '') => `
+        <pre class="notranslate"><code class="notranslate">${codeContent}</code></pre>
+        <div class="clipboard-container position-absolute right-0 top-0 ${additionalClasses}">
+            <clipboard-copy class="ClipboardButton btn m-2 p-0" role="button" style="display: inherit;">
+                <svg height="16" width="16" class="octicon octicon-copy m-2"><path d="${IconList["copy"]}"></path></svg>
+                <svg height="16" width="16" class="octicon octicon-check color-fg-success m-2 d-none"><path d="${IconList["check"]}"></path></svg>
+            </clipboard-copy>
+            <div class="copy-feedback">Copied!</div>
+        </div>
+    `;
 
+    const handleCodeElements = (selector = '') => {
+        document.querySelectorAll(selector).forEach(codeElement => {
+            const codeContent = codeElement.innerHTML;
+            const newStructure = document.createElement('div');
+            newStructure.className = 'snippet-clipboard-content position-relative overflow-auto';
+            newStructure.innerHTML = createClipboardHTML(codeContent);
+
+            const parentElement = codeElement.parentElement;
+            if (selector.includes('highlight')) {
+                parentElement.insertBefore(newStructure, codeElement.nextSibling);
+                parentElement.removeChild(codeElement);
+            } else {
+                parentElement.parentElement.replaceChild(newStructure, parentElement);
+            }
+        });
+    };
+
+    handleCodeElements('pre.notranslate > code.notranslate');
+    handleCodeElements('div.highlight > pre.notranslate');
+
+    let currentFeedback = null;
+    document.querySelectorAll('clipboard-copy').forEach(copyButton => {
+        copyButton.addEventListener('click', () => {
+            const codeContent = copyButton.closest('.snippet-clipboard-content').innerText;
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = codeContent;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            const copyIcon = copyButton.querySelector('.octicon-copy');
+            const checkIcon = copyButton.querySelector('.octicon-check');
+            const copyFeedback = copyButton.nextElementSibling;
+
+            if (currentFeedback && currentFeedback !== copyFeedback) {currentFeedback.style.display = 'none';}
+            currentFeedback = copyFeedback;
+
+            copyIcon.classList.add('d-none');
+            checkIcon.classList.remove('d-none');
+            copyFeedback.style.display = 'block';
+            copyButton.style.borderColor = 'var(--color-success-fg)';
+
+            setTimeout(() => {
+                copyIcon.classList.remove('d-none');
+                checkIcon.classList.add('d-none');
+                copyFeedback.style.display = 'none';
+                copyButton.style.borderColor = '';
+            }, 2000);
+        });
+    });
+});
 
 </script>
 
