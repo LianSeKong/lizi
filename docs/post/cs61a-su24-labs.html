@@ -1896,7 +1896,427 @@ CREATE TABLE remaining AS
 
 ```
 
-。">
+## lab12
+
+
+``` sqlite
+.read data.sql
+
+CREATE TABLE number_of_options AS
+  SELECT count(DISTINCT(meat)) FROM main_course;
+
+
+CREATE TABLE calories AS
+  SELECT COUNT(*) FROM pies as a, main_course as b where (a.calories + b.calories) < 2500;
+
+
+CREATE TABLE healthiest_meats AS
+  SELECT meat,  MIN(m.calories + p.calories) as total 
+  FROM main_course as m, pies as p 
+  GROUP BY meat
+  HAVING MAX(m.calories + p.calories) < 3000
+  ORDER BY total ASC;
+
+
+```
+
+``` scheme
+
+(define (no-repeats s) 
+    (if (null? s) 
+        s
+        (cons (car s) 
+            (no-repeats 
+                (filter (lambda (x) (not (= x (car s)))) (cdr s))
+            )
+        )
+    )
+)
+
+(define (without-duplicates lst) (no-repeats lst))
+
+(define (reverse lst) 
+    (
+        if (null? lst) 
+        lst
+        (append (reverse (cdr lst)) (list (car lst)))
+    )
+)
+
+
+
+
+```
+
+``` python
+def insert_into_all(item, nested_list):
+    '''Return a new list consisting of all the lists in nested_list,
+    but with item added to the front of each. You can assume that
+     nested_list is a list of lists.
+
+    >>> nl = [[], [1, 2], [3]]
+    >>> insert_into_all(0, nl)
+    [[0], [0, 1, 2], [0, 3]]
+    '''
+    return [[item] + lst  for lst in nested_list]
+
+# fn(s) = fn(s - 1) + g(fn (s - 1), s)
+
+
+def subseqs(s):
+    '''Return a nested list (a list of lists) of all subsequences of S.
+    The subsequences can appear in any order. You can assume S is a list.
+
+    >>> seqs = subseqs([1, 2, 3])
+    >>> sorted(seqs)
+    [[], [1], [1, 2], [1, 2, 3], [1, 3], [2], [2, 3], [3]]
+    >>> subseqs([])
+    [[]]
+    '''
+    if len(s) == 0:
+        return [[]]
+    else:
+        lst = subseqs(s[1:])
+        return insert_into_all(s[0], lst) + lst
+
+# fn(s, p) = fn(s - 1, p) + g(fn (s - 1, s), s)
+
+
+def non_decrease_subseqs(s):
+    '''Assuming that S is a list, return a nested list of all subsequences
+    of S (a list of lists) for which the elements of the subsequence
+    are strictly nondecreasing. The subsequences can appear in any order.
+
+    >>> seqs = non_decrease_subseqs([1, 3, 2])
+    >>> sorted(seqs)
+    [[], [1], [1, 2], [1, 3], [2], [3]]
+    >>> non_decrease_subseqs([])
+    [[]]
+    >>> seqs2 = non_decrease_subseqs([1, 1, 2])
+    >>> sorted(seqs2)
+    [[], [1], [1], [1, 1], [1, 1, 2], [1, 2], [1, 2], [2]]
+    '''
+    def subseq_helper(s, prev):
+        if not s:
+            return [[]]
+        elif s[0] < prev:
+            return subseq_helper(s[1:], prev)
+        else:
+            a = subseq_helper(s[1:], s[0]) 
+            b = subseq_helper(s[1:], prev)
+            return insert_into_all(s[0], a) + b
+    return subseq_helper(s, -1)
+
+
+def num_trees(n):
+    '''Returns the number of unique full binary trees with exactly n leaves. E.g.,
+
+    1   2        3       3    ...
+    *   *        *       *
+       / \      / \     / \
+      *   *    *   *   *   *
+              / \         / \
+             *   *       *   *
+
+    >>> num_trees(1)
+    1
+    >>> num_trees(2)
+    1
+    >>> num_trees(3)
+    2
+    >>> num_trees(8)
+    429
+
+    '''
+    if n == 1 or n == 2:
+        return 1
+    return sum(num_trees(k) * num_trees(n - k) for k in range(1, n))
+
+    
+def partition_gen(n):
+    '''
+    >>> partitions = [sorted(p) for p in partition_gen(4)]
+    >>> for partition in sorted(partitions): # note: order doesn't matter
+    ...     print(partition)
+    [1, 1, 1, 1]
+    [1, 1, 2]
+    [1, 3]
+    [2, 2]
+    [4]
+    '''
+    def yield_helper(num, segment):
+        if num == 0:
+            yield []
+        elif num > 0 and segment > 0:
+            for small_part in yield_helper(num - segment, segment):
+                yield [segment] + small_part
+            yield from yield_helper(num, segment - 1)
+    yield from yield_helper(n, n)
+
+
+class CucumberGame:
+    '''Play a round and return all winners so far. Cards is a list of pairs.
+    Each (who, card) pair in cards indicates who plays and what card they play.
+    >>> g = CucumberGame()
+    >>> g.play_round(3, [(3, 4), (0, 8), (1, 8), (2, 5)])
+    >>> g.winners
+    [1]
+    >>> g.play_round(1, [(3, 5), (1, 4), (2, 5), (0, 8), (3, 7), (0, 6), (1, 7)])
+    It is not your turn, player 3
+    It is not your turn, player 0
+    The round is over, player 1
+    >>> g.winners
+    [1, 3]
+    >>> g.play_round(3, [(3, 7), (2, 5), (0, 9)]) # Round is never completed
+    It is not your turn, player 2
+    >>> g.winners
+    [1, 3]
+    '''
+    def __init__(self):
+        self.winners = []
+        
+    def play_round(self, starter, cards):
+        r = Round(starter)
+        for who, card in cards:
+            try:
+                r.play(who, card)
+            except AssertionError as e:
+                print(e)
+        if r.winner != None:
+            self.winners.append(r.winner)
+
+
+class Round:
+    players = 4
+
+    def __init__(self, starter):
+        self.starter = starter
+        self.next_player = starter
+        self.highest = -1
+        self.winner = None
+
+    def play(self, who, card):
+        assert not self.is_complete(), f'The round is over, player {who}'
+        assert who == self.next_player, f'It is not your turn, player {who}'
+        self.next_player = (self.next_player + 1) % Round.players
+        if card >= self.highest:
+            self.highest = card
+            self.temp = who
+        if self.next_player == self.starter:
+            self.winner = self.temp
+
+            
+
+    def is_complete(self):
+        ''' Checks if a game could end. '''
+        return self.winner is not None
+
+
+def trade(first, second):
+    '''Exchange the smallest prefixes of first and second that have equal sum.
+
+    >>> a = [1, 1, 3, 2, 1, 1, 4]
+    >>> b = [4, 3, 2, 7]
+    >>> trade(a, b) # Trades 1+1+3+2=7 for 4+3=7
+    'Deal!'
+    >>> a
+    [4, 3, 1, 1, 4]
+    >>> b
+    [1, 1, 3, 2, 2, 7]
+    >>> c = [3, 3, 2, 4, 1]
+    >>> trade(b, c)
+    'No deal!'
+    >>> b
+    [1, 1, 3, 2, 2, 7]
+    >>> c
+    [3, 3, 2, 4, 1]
+    >>> trade(a, c)
+    'Deal!'
+    >>> a
+    [3, 3, 2, 1, 4]
+    >>> b
+    [1, 1, 3, 2, 2, 7]
+    >>> c
+    [4, 3, 1, 4, 1]
+    >>> d = [1, 1]
+    >>> e = [2]
+    >>> trade(d, e)
+    'Deal!'
+    >>> d
+    [2]
+    >>> e
+    [1, 1]
+    '''
+    m, n = 1, 1
+
+    equal_prefix = lambda: sum(first[:m]) == sum(second[:n])
+    while m <= len(first) and n <= len(second) and not equal_prefix():
+        if sum(first[:m]) < sum(second[:n]):
+            m += 1
+        else:
+            n += 1
+
+    if equal_prefix():
+        first[:m], second[:n] = second[:n], first[:m]
+        return 'Deal!'
+    else:
+        return 'No deal!'
+
+def card(n):
+    '''Return the playing card numeral as a string for a positive n <= 13.'''
+    assert type(n) == int and n > 0 and n <= 13, 'Bad card n'
+    specials = {1: 'A', 11: 'J', 12: 'Q', 13: 'K'}
+    return specials.get(n, str(n))
+
+def shuffle(cards):
+    '''Return a shuffled list that interleaves the two halves of cards.
+
+    >>> shuffle(range(6))
+    [0, 3, 1, 4, 2, 5]
+    >>> suits = ['H', 'D', 'S', 'C']
+    >>> cards = [card(n) + suit for n in range(1,14) for suit in suits]
+    >>> cards[:12]
+    ['AH', 'AD', 'AS', 'AC', '2H', '2D', '2S', '2C', '3H', '3D', '3S', '3C']
+    >>> cards[26:30]
+    ['7S', '7C', '8H', '8D']
+    >>> shuffle(cards)[:12]
+    ['AH', '7S', 'AD', '7C', 'AS', '8H', 'AC', '8D', '2H', '8S', '2D', '8C']
+    >>> shuffle(shuffle(cards))[:12]
+    ['AH', '4D', '7S', '10C', 'AD', '4S', '7C', 'JH', 'AS', '4C', '8H', 'JD']
+    >>> cards[:12]  # Should not be changed
+    ['AH', 'AD', 'AS', 'AC', '2H', '2D', '2S', '2C', '3H', '3D', '3S', '3C']
+    '''
+    assert len(cards) % 2 == 0, 'len(cards) must be even'
+    half = len(cards) // 2
+    shuffled = []
+    for i in range(half):
+        shuffled.append(cards[i])
+        shuffled.append(cards[i + half])
+    return shuffled
+
+
+def link_pop(lnk, index=-1):
+    '''Implement the pop method for a Linked List.
+    
+    >>> lnk = Link(1, Link(2, Link(3, Link(4, Link(5)))))
+    >>> removed = link_pop(lnk)
+    >>> print(removed)
+    5
+    >>> print(lnk)
+    <1 2 3 4>
+    >>> link_pop(lnk, 2)
+    3
+    >>> print(lnk)
+    <1 2 4>
+    >>> link_pop(lnk)
+    4
+    >>> link_pop(lnk)
+    2
+    >>> print(lnk)
+    <1>
+    '''
+    if index == -1:
+        while not lnk.rest.rest is Link.empty:
+            lnk = lnk.rest
+        removed = lnk.rest.first
+        lnk.rest = lnk.rest.rest
+    else:
+        while index > 1:
+            lnk = lnk.rest
+            index -= 1
+        removed = lnk.rest.first
+        lnk.rest = lnk.rest.rest
+    return removed
+        
+
+def deep_len(lnk):
+    ''' Returns the deep length of a possibly deep linked list.
+
+    >>> deep_len(Link(1, Link(2, Link(3))))
+    3
+    >>> deep_len(Link(Link(1, Link(2)), Link(3, Link(4))))
+    4
+    >>> levels = Link(Link(Link(1, Link(2)), Link(3)), Link(Link(4), Link(5)))
+    >>> print(levels)
+    <<<1 2> 3> <4> 5>
+    >>> deep_len(levels)
+    5
+    '''
+    if lnk is Link.empty:
+        return 0
+    elif not isinstance(lnk, Link):
+        return 1
+    else:
+        return deep_len(lnk.first) + deep_len(lnk.rest)
+
+
+def every_other(s):
+    '''Mutates a linked list so that all the odd-indiced elements are removed
+    (using 0-based indexing).
+
+    >>> s = Link(1, Link(2, Link(3, Link(4))))
+    >>> every_other(s)
+    >>> s
+    Link(1, Link(3))
+    >>> odd_length = Link(5, Link(3, Link(1)))
+    >>> every_other(odd_length)
+    >>> odd_length
+    Link(5, Link(1))
+    >>> singleton = Link(4)
+    >>> every_other(singleton)
+    >>> singleton
+    Link(4)
+    '''
+    if s is Link.empty or s.rest is Link.empty:
+        return
+    s.rest = s.rest.rest
+    every_other(s.rest)
+
+
+class Link:
+    '''A linked list.
+
+    >>> s = Link(1)
+    >>> s.first
+    1
+    >>> s.rest is Link.empty
+    True
+    >>> s = Link(2, Link(3, Link(4)))
+    >>> s.first = 5
+    >>> s.rest.first = 6
+    >>> s.rest.rest = Link.empty
+    >>> s                                    # Displays the contents of repr(s)
+    Link(5, Link(6))
+    >>> s.rest = Link(7, Link(Link(8, Link(9))))
+    >>> s
+    Link(5, Link(7, Link(Link(8, Link(9)))))
+    >>> print(s)                             # Prints str(s)
+    <5 7 <8 9>>
+    '''
+    empty = ()
+
+    def __init__(self, first, rest=empty):
+        assert rest is Link.empty or isinstance(rest, Link)
+        self.first = first
+        self.rest = rest
+
+    def __repr__(self):
+        if self.rest is not Link.empty:
+            rest_repr = ', ' + repr(self.rest)
+        else:
+            rest_repr = ''
+        return 'Link(' + repr(self.first) + rest_repr + ')'
+
+    def __str__(self):
+        string = '<'
+        while self.rest is not Link.empty:
+            string += str(self.first) + ' '
+            self = self.rest
+        return string + str(self.first) + '>'
+
+
+
+```。">
 <meta property="og:title" content="cs61a-su24-labs">
 <meta property="og:description" content="# Cs61a Summer2024 Labs
 
@@ -3784,7 +4204,427 @@ CREATE TABLE remaining AS
 
 ```
 
-。">
+## lab12
+
+
+``` sqlite
+.read data.sql
+
+CREATE TABLE number_of_options AS
+  SELECT count(DISTINCT(meat)) FROM main_course;
+
+
+CREATE TABLE calories AS
+  SELECT COUNT(*) FROM pies as a, main_course as b where (a.calories + b.calories) < 2500;
+
+
+CREATE TABLE healthiest_meats AS
+  SELECT meat,  MIN(m.calories + p.calories) as total 
+  FROM main_course as m, pies as p 
+  GROUP BY meat
+  HAVING MAX(m.calories + p.calories) < 3000
+  ORDER BY total ASC;
+
+
+```
+
+``` scheme
+
+(define (no-repeats s) 
+    (if (null? s) 
+        s
+        (cons (car s) 
+            (no-repeats 
+                (filter (lambda (x) (not (= x (car s)))) (cdr s))
+            )
+        )
+    )
+)
+
+(define (without-duplicates lst) (no-repeats lst))
+
+(define (reverse lst) 
+    (
+        if (null? lst) 
+        lst
+        (append (reverse (cdr lst)) (list (car lst)))
+    )
+)
+
+
+
+
+```
+
+``` python
+def insert_into_all(item, nested_list):
+    '''Return a new list consisting of all the lists in nested_list,
+    but with item added to the front of each. You can assume that
+     nested_list is a list of lists.
+
+    >>> nl = [[], [1, 2], [3]]
+    >>> insert_into_all(0, nl)
+    [[0], [0, 1, 2], [0, 3]]
+    '''
+    return [[item] + lst  for lst in nested_list]
+
+# fn(s) = fn(s - 1) + g(fn (s - 1), s)
+
+
+def subseqs(s):
+    '''Return a nested list (a list of lists) of all subsequences of S.
+    The subsequences can appear in any order. You can assume S is a list.
+
+    >>> seqs = subseqs([1, 2, 3])
+    >>> sorted(seqs)
+    [[], [1], [1, 2], [1, 2, 3], [1, 3], [2], [2, 3], [3]]
+    >>> subseqs([])
+    [[]]
+    '''
+    if len(s) == 0:
+        return [[]]
+    else:
+        lst = subseqs(s[1:])
+        return insert_into_all(s[0], lst) + lst
+
+# fn(s, p) = fn(s - 1, p) + g(fn (s - 1, s), s)
+
+
+def non_decrease_subseqs(s):
+    '''Assuming that S is a list, return a nested list of all subsequences
+    of S (a list of lists) for which the elements of the subsequence
+    are strictly nondecreasing. The subsequences can appear in any order.
+
+    >>> seqs = non_decrease_subseqs([1, 3, 2])
+    >>> sorted(seqs)
+    [[], [1], [1, 2], [1, 3], [2], [3]]
+    >>> non_decrease_subseqs([])
+    [[]]
+    >>> seqs2 = non_decrease_subseqs([1, 1, 2])
+    >>> sorted(seqs2)
+    [[], [1], [1], [1, 1], [1, 1, 2], [1, 2], [1, 2], [2]]
+    '''
+    def subseq_helper(s, prev):
+        if not s:
+            return [[]]
+        elif s[0] < prev:
+            return subseq_helper(s[1:], prev)
+        else:
+            a = subseq_helper(s[1:], s[0]) 
+            b = subseq_helper(s[1:], prev)
+            return insert_into_all(s[0], a) + b
+    return subseq_helper(s, -1)
+
+
+def num_trees(n):
+    '''Returns the number of unique full binary trees with exactly n leaves. E.g.,
+
+    1   2        3       3    ...
+    *   *        *       *
+       / \      / \     / \
+      *   *    *   *   *   *
+              / \         / \
+             *   *       *   *
+
+    >>> num_trees(1)
+    1
+    >>> num_trees(2)
+    1
+    >>> num_trees(3)
+    2
+    >>> num_trees(8)
+    429
+
+    '''
+    if n == 1 or n == 2:
+        return 1
+    return sum(num_trees(k) * num_trees(n - k) for k in range(1, n))
+
+    
+def partition_gen(n):
+    '''
+    >>> partitions = [sorted(p) for p in partition_gen(4)]
+    >>> for partition in sorted(partitions): # note: order doesn't matter
+    ...     print(partition)
+    [1, 1, 1, 1]
+    [1, 1, 2]
+    [1, 3]
+    [2, 2]
+    [4]
+    '''
+    def yield_helper(num, segment):
+        if num == 0:
+            yield []
+        elif num > 0 and segment > 0:
+            for small_part in yield_helper(num - segment, segment):
+                yield [segment] + small_part
+            yield from yield_helper(num, segment - 1)
+    yield from yield_helper(n, n)
+
+
+class CucumberGame:
+    '''Play a round and return all winners so far. Cards is a list of pairs.
+    Each (who, card) pair in cards indicates who plays and what card they play.
+    >>> g = CucumberGame()
+    >>> g.play_round(3, [(3, 4), (0, 8), (1, 8), (2, 5)])
+    >>> g.winners
+    [1]
+    >>> g.play_round(1, [(3, 5), (1, 4), (2, 5), (0, 8), (3, 7), (0, 6), (1, 7)])
+    It is not your turn, player 3
+    It is not your turn, player 0
+    The round is over, player 1
+    >>> g.winners
+    [1, 3]
+    >>> g.play_round(3, [(3, 7), (2, 5), (0, 9)]) # Round is never completed
+    It is not your turn, player 2
+    >>> g.winners
+    [1, 3]
+    '''
+    def __init__(self):
+        self.winners = []
+        
+    def play_round(self, starter, cards):
+        r = Round(starter)
+        for who, card in cards:
+            try:
+                r.play(who, card)
+            except AssertionError as e:
+                print(e)
+        if r.winner != None:
+            self.winners.append(r.winner)
+
+
+class Round:
+    players = 4
+
+    def __init__(self, starter):
+        self.starter = starter
+        self.next_player = starter
+        self.highest = -1
+        self.winner = None
+
+    def play(self, who, card):
+        assert not self.is_complete(), f'The round is over, player {who}'
+        assert who == self.next_player, f'It is not your turn, player {who}'
+        self.next_player = (self.next_player + 1) % Round.players
+        if card >= self.highest:
+            self.highest = card
+            self.temp = who
+        if self.next_player == self.starter:
+            self.winner = self.temp
+
+            
+
+    def is_complete(self):
+        ''' Checks if a game could end. '''
+        return self.winner is not None
+
+
+def trade(first, second):
+    '''Exchange the smallest prefixes of first and second that have equal sum.
+
+    >>> a = [1, 1, 3, 2, 1, 1, 4]
+    >>> b = [4, 3, 2, 7]
+    >>> trade(a, b) # Trades 1+1+3+2=7 for 4+3=7
+    'Deal!'
+    >>> a
+    [4, 3, 1, 1, 4]
+    >>> b
+    [1, 1, 3, 2, 2, 7]
+    >>> c = [3, 3, 2, 4, 1]
+    >>> trade(b, c)
+    'No deal!'
+    >>> b
+    [1, 1, 3, 2, 2, 7]
+    >>> c
+    [3, 3, 2, 4, 1]
+    >>> trade(a, c)
+    'Deal!'
+    >>> a
+    [3, 3, 2, 1, 4]
+    >>> b
+    [1, 1, 3, 2, 2, 7]
+    >>> c
+    [4, 3, 1, 4, 1]
+    >>> d = [1, 1]
+    >>> e = [2]
+    >>> trade(d, e)
+    'Deal!'
+    >>> d
+    [2]
+    >>> e
+    [1, 1]
+    '''
+    m, n = 1, 1
+
+    equal_prefix = lambda: sum(first[:m]) == sum(second[:n])
+    while m <= len(first) and n <= len(second) and not equal_prefix():
+        if sum(first[:m]) < sum(second[:n]):
+            m += 1
+        else:
+            n += 1
+
+    if equal_prefix():
+        first[:m], second[:n] = second[:n], first[:m]
+        return 'Deal!'
+    else:
+        return 'No deal!'
+
+def card(n):
+    '''Return the playing card numeral as a string for a positive n <= 13.'''
+    assert type(n) == int and n > 0 and n <= 13, 'Bad card n'
+    specials = {1: 'A', 11: 'J', 12: 'Q', 13: 'K'}
+    return specials.get(n, str(n))
+
+def shuffle(cards):
+    '''Return a shuffled list that interleaves the two halves of cards.
+
+    >>> shuffle(range(6))
+    [0, 3, 1, 4, 2, 5]
+    >>> suits = ['H', 'D', 'S', 'C']
+    >>> cards = [card(n) + suit for n in range(1,14) for suit in suits]
+    >>> cards[:12]
+    ['AH', 'AD', 'AS', 'AC', '2H', '2D', '2S', '2C', '3H', '3D', '3S', '3C']
+    >>> cards[26:30]
+    ['7S', '7C', '8H', '8D']
+    >>> shuffle(cards)[:12]
+    ['AH', '7S', 'AD', '7C', 'AS', '8H', 'AC', '8D', '2H', '8S', '2D', '8C']
+    >>> shuffle(shuffle(cards))[:12]
+    ['AH', '4D', '7S', '10C', 'AD', '4S', '7C', 'JH', 'AS', '4C', '8H', 'JD']
+    >>> cards[:12]  # Should not be changed
+    ['AH', 'AD', 'AS', 'AC', '2H', '2D', '2S', '2C', '3H', '3D', '3S', '3C']
+    '''
+    assert len(cards) % 2 == 0, 'len(cards) must be even'
+    half = len(cards) // 2
+    shuffled = []
+    for i in range(half):
+        shuffled.append(cards[i])
+        shuffled.append(cards[i + half])
+    return shuffled
+
+
+def link_pop(lnk, index=-1):
+    '''Implement the pop method for a Linked List.
+    
+    >>> lnk = Link(1, Link(2, Link(3, Link(4, Link(5)))))
+    >>> removed = link_pop(lnk)
+    >>> print(removed)
+    5
+    >>> print(lnk)
+    <1 2 3 4>
+    >>> link_pop(lnk, 2)
+    3
+    >>> print(lnk)
+    <1 2 4>
+    >>> link_pop(lnk)
+    4
+    >>> link_pop(lnk)
+    2
+    >>> print(lnk)
+    <1>
+    '''
+    if index == -1:
+        while not lnk.rest.rest is Link.empty:
+            lnk = lnk.rest
+        removed = lnk.rest.first
+        lnk.rest = lnk.rest.rest
+    else:
+        while index > 1:
+            lnk = lnk.rest
+            index -= 1
+        removed = lnk.rest.first
+        lnk.rest = lnk.rest.rest
+    return removed
+        
+
+def deep_len(lnk):
+    ''' Returns the deep length of a possibly deep linked list.
+
+    >>> deep_len(Link(1, Link(2, Link(3))))
+    3
+    >>> deep_len(Link(Link(1, Link(2)), Link(3, Link(4))))
+    4
+    >>> levels = Link(Link(Link(1, Link(2)), Link(3)), Link(Link(4), Link(5)))
+    >>> print(levels)
+    <<<1 2> 3> <4> 5>
+    >>> deep_len(levels)
+    5
+    '''
+    if lnk is Link.empty:
+        return 0
+    elif not isinstance(lnk, Link):
+        return 1
+    else:
+        return deep_len(lnk.first) + deep_len(lnk.rest)
+
+
+def every_other(s):
+    '''Mutates a linked list so that all the odd-indiced elements are removed
+    (using 0-based indexing).
+
+    >>> s = Link(1, Link(2, Link(3, Link(4))))
+    >>> every_other(s)
+    >>> s
+    Link(1, Link(3))
+    >>> odd_length = Link(5, Link(3, Link(1)))
+    >>> every_other(odd_length)
+    >>> odd_length
+    Link(5, Link(1))
+    >>> singleton = Link(4)
+    >>> every_other(singleton)
+    >>> singleton
+    Link(4)
+    '''
+    if s is Link.empty or s.rest is Link.empty:
+        return
+    s.rest = s.rest.rest
+    every_other(s.rest)
+
+
+class Link:
+    '''A linked list.
+
+    >>> s = Link(1)
+    >>> s.first
+    1
+    >>> s.rest is Link.empty
+    True
+    >>> s = Link(2, Link(3, Link(4)))
+    >>> s.first = 5
+    >>> s.rest.first = 6
+    >>> s.rest.rest = Link.empty
+    >>> s                                    # Displays the contents of repr(s)
+    Link(5, Link(6))
+    >>> s.rest = Link(7, Link(Link(8, Link(9))))
+    >>> s
+    Link(5, Link(7, Link(Link(8, Link(9)))))
+    >>> print(s)                             # Prints str(s)
+    <5 7 <8 9>>
+    '''
+    empty = ()
+
+    def __init__(self, first, rest=empty):
+        assert rest is Link.empty or isinstance(rest, Link)
+        self.first = first
+        self.rest = rest
+
+    def __repr__(self):
+        if self.rest is not Link.empty:
+            rest_repr = ', ' + repr(self.rest)
+        else:
+            rest_repr = ''
+        return 'Link(' + repr(self.first) + rest_repr + ')'
+
+    def __str__(self):
+        string = '<'
+        while self.rest is not Link.empty:
+            string += str(self.first) + ' '
+            self = self.rest
+        return string + str(self.first) + '>'
+
+
+
+```。">
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://LianSeKong.github.io/lizi/post/cs61a-su24-labs.html">
 <meta property="og:image" content="https://img.icons8.com/doodle/480/mugman.png">
@@ -5652,7 +6492,417 @@ CREATE TABLE remaining AS
     FROM finals, sizes WHERE hall = room GROUP BY course;
 
 
-</code></pre></div>
+</code></pre>
+<h2>lab12</h2>
+<pre lang="sqlite" class="notranslate"><code class="notranslate">.read data.sql
+
+CREATE TABLE number_of_options AS
+  SELECT count(DISTINCT(meat)) FROM main_course;
+
+
+CREATE TABLE calories AS
+  SELECT COUNT(*) FROM pies as a, main_course as b where (a.calories + b.calories) &lt; 2500;
+
+
+CREATE TABLE healthiest_meats AS
+  SELECT meat,  MIN(m.calories + p.calories) as total 
+  FROM main_course as m, pies as p 
+  GROUP BY meat
+  HAVING MAX(m.calories + p.calories) &lt; 3000
+  ORDER BY total ASC;
+
+
+</code></pre>
+<div class="highlight highlight-source-scheme"><pre class="notranslate">(<span class="pl-k">define</span> (<span class="pl-en">no-repeats</span><span class="pl-smi"> s</span>) 
+    (<span class="pl-k">if</span> (<span class="pl-c1">null?</span> s) 
+        s
+        (<span class="pl-c1">cons</span> (<span class="pl-c1">car</span> s) 
+            (no-repeats 
+                (filter (<span class="pl-k">lambda</span> (<span class="pl-v">x</span>) (<span class="pl-c1">not</span> (<span class="pl-k">=</span> x (<span class="pl-c1">car</span> s)))) (<span class="pl-c1">cdr</span> s))
+            )
+        )
+    )
+)
+
+(<span class="pl-k">define</span> (<span class="pl-en">without-duplicates</span><span class="pl-smi"> lst</span>) (no-repeats lst))
+
+(<span class="pl-k">define</span> (<span class="pl-en">reverse</span><span class="pl-smi"> lst</span>) 
+    (
+        <span class="pl-k">if</span> (<span class="pl-c1">null?</span> lst) 
+        lst
+        (<span class="pl-c1">append</span> (<span class="pl-c1">reverse</span> (<span class="pl-c1">cdr</span> lst)) (<span class="pl-c1">list</span> (<span class="pl-c1">car</span> lst)))
+    )
+)
+
+
+
+</pre></div>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">insert_into_all</span>(<span class="pl-s1">item</span>, <span class="pl-s1">nested_list</span>):
+    <span class="pl-s">"""Return a new list consisting of all the lists in nested_list,</span>
+<span class="pl-s">    but with item added to the front of each. You can assume that</span>
+<span class="pl-s">     nested_list is a list of lists.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; nl = [[], [1, 2], [3]]</span>
+<span class="pl-s">    &gt;&gt;&gt; insert_into_all(0, nl)</span>
+<span class="pl-s">    [[0], [0, 1, 2], [0, 3]]</span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">return</span> [[<span class="pl-s1">item</span>] <span class="pl-c1">+</span> <span class="pl-s1">lst</span>  <span class="pl-k">for</span> <span class="pl-s1">lst</span> <span class="pl-c1">in</span> <span class="pl-s1">nested_list</span>]
+
+<span class="pl-c"># fn(s) = fn(s - 1) + g(fn (s - 1), s)</span>
+
+
+<span class="pl-k">def</span> <span class="pl-en">subseqs</span>(<span class="pl-s1">s</span>):
+    <span class="pl-s">"""Return a nested list (a list of lists) of all subsequences of S.</span>
+<span class="pl-s">    The subsequences can appear in any order. You can assume S is a list.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; seqs = subseqs([1, 2, 3])</span>
+<span class="pl-s">    &gt;&gt;&gt; sorted(seqs)</span>
+<span class="pl-s">    [[], [1], [1, 2], [1, 2, 3], [1, 3], [2], [2, 3], [3]]</span>
+<span class="pl-s">    &gt;&gt;&gt; subseqs([])</span>
+<span class="pl-s">    [[]]</span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">if</span> <span class="pl-en">len</span>(<span class="pl-s1">s</span>) <span class="pl-c1">==</span> <span class="pl-c1">0</span>:
+        <span class="pl-k">return</span> [[]]
+    <span class="pl-k">else</span>:
+        <span class="pl-s1">lst</span> <span class="pl-c1">=</span> <span class="pl-en">subseqs</span>(<span class="pl-s1">s</span>[<span class="pl-c1">1</span>:])
+        <span class="pl-k">return</span> <span class="pl-en">insert_into_all</span>(<span class="pl-s1">s</span>[<span class="pl-c1">0</span>], <span class="pl-s1">lst</span>) <span class="pl-c1">+</span> <span class="pl-s1">lst</span>
+
+<span class="pl-c"># fn(s, p) = fn(s - 1, p) + g(fn (s - 1, s), s)</span>
+
+
+<span class="pl-k">def</span> <span class="pl-en">non_decrease_subseqs</span>(<span class="pl-s1">s</span>):
+    <span class="pl-s">"""Assuming that S is a list, return a nested list of all subsequences</span>
+<span class="pl-s">    of S (a list of lists) for which the elements of the subsequence</span>
+<span class="pl-s">    are strictly nondecreasing. The subsequences can appear in any order.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; seqs = non_decrease_subseqs([1, 3, 2])</span>
+<span class="pl-s">    &gt;&gt;&gt; sorted(seqs)</span>
+<span class="pl-s">    [[], [1], [1, 2], [1, 3], [2], [3]]</span>
+<span class="pl-s">    &gt;&gt;&gt; non_decrease_subseqs([])</span>
+<span class="pl-s">    [[]]</span>
+<span class="pl-s">    &gt;&gt;&gt; seqs2 = non_decrease_subseqs([1, 1, 2])</span>
+<span class="pl-s">    &gt;&gt;&gt; sorted(seqs2)</span>
+<span class="pl-s">    [[], [1], [1], [1, 1], [1, 1, 2], [1, 2], [1, 2], [2]]</span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">def</span> <span class="pl-en">subseq_helper</span>(<span class="pl-s1">s</span>, <span class="pl-s1">prev</span>):
+        <span class="pl-k">if</span> <span class="pl-c1">not</span> <span class="pl-s1">s</span>:
+            <span class="pl-k">return</span> [[]]
+        <span class="pl-k">elif</span> <span class="pl-s1">s</span>[<span class="pl-c1">0</span>] <span class="pl-c1">&lt;</span> <span class="pl-s1">prev</span>:
+            <span class="pl-k">return</span> <span class="pl-en">subseq_helper</span>(<span class="pl-s1">s</span>[<span class="pl-c1">1</span>:], <span class="pl-s1">prev</span>)
+        <span class="pl-k">else</span>:
+            <span class="pl-s1">a</span> <span class="pl-c1">=</span> <span class="pl-en">subseq_helper</span>(<span class="pl-s1">s</span>[<span class="pl-c1">1</span>:], <span class="pl-s1">s</span>[<span class="pl-c1">0</span>]) 
+            <span class="pl-s1">b</span> <span class="pl-c1">=</span> <span class="pl-en">subseq_helper</span>(<span class="pl-s1">s</span>[<span class="pl-c1">1</span>:], <span class="pl-s1">prev</span>)
+            <span class="pl-k">return</span> <span class="pl-en">insert_into_all</span>(<span class="pl-s1">s</span>[<span class="pl-c1">0</span>], <span class="pl-s1">a</span>) <span class="pl-c1">+</span> <span class="pl-s1">b</span>
+    <span class="pl-k">return</span> <span class="pl-en">subseq_helper</span>(<span class="pl-s1">s</span>, <span class="pl-c1">-</span><span class="pl-c1">1</span>)
+
+
+<span class="pl-k">def</span> <span class="pl-en">num_trees</span>(<span class="pl-s1">n</span>):
+    <span class="pl-s">"""Returns the number of unique full binary trees with exactly n leaves. E.g.,</span>
+<span class="pl-s"></span>
+<span class="pl-s">    1   2        3       3    ...</span>
+<span class="pl-s">    *   *        *       *</span>
+<span class="pl-s">       / \      / \     / <span class="pl-cce">\</span></span>
+<span class="pl-s"><span class="pl-cce"></span>      *   *    *   *   *   *</span>
+<span class="pl-s">              / \         / <span class="pl-cce">\</span></span>
+<span class="pl-s"><span class="pl-cce"></span>             *   *       *   *</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; num_trees(1)</span>
+<span class="pl-s">    1</span>
+<span class="pl-s">    &gt;&gt;&gt; num_trees(2)</span>
+<span class="pl-s">    1</span>
+<span class="pl-s">    &gt;&gt;&gt; num_trees(3)</span>
+<span class="pl-s">    2</span>
+<span class="pl-s">    &gt;&gt;&gt; num_trees(8)</span>
+<span class="pl-s">    429</span>
+<span class="pl-s"></span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">if</span> <span class="pl-s1">n</span> <span class="pl-c1">==</span> <span class="pl-c1">1</span> <span class="pl-c1">or</span> <span class="pl-s1">n</span> <span class="pl-c1">==</span> <span class="pl-c1">2</span>:
+        <span class="pl-k">return</span> <span class="pl-c1">1</span>
+    <span class="pl-k">return</span> <span class="pl-en">sum</span>(<span class="pl-en">num_trees</span>(<span class="pl-s1">k</span>) <span class="pl-c1">*</span> <span class="pl-en">num_trees</span>(<span class="pl-s1">n</span> <span class="pl-c1">-</span> <span class="pl-s1">k</span>) <span class="pl-k">for</span> <span class="pl-s1">k</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-c1">1</span>, <span class="pl-s1">n</span>))
+
+    
+<span class="pl-k">def</span> <span class="pl-en">partition_gen</span>(<span class="pl-s1">n</span>):
+    <span class="pl-s">"""</span>
+<span class="pl-s">    &gt;&gt;&gt; partitions = [sorted(p) for p in partition_gen(4)]</span>
+<span class="pl-s">    &gt;&gt;&gt; for partition in sorted(partitions): # note: order doesn't matter</span>
+<span class="pl-s">    ...     print(partition)</span>
+<span class="pl-s">    [1, 1, 1, 1]</span>
+<span class="pl-s">    [1, 1, 2]</span>
+<span class="pl-s">    [1, 3]</span>
+<span class="pl-s">    [2, 2]</span>
+<span class="pl-s">    [4]</span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">def</span> <span class="pl-en">yield_helper</span>(<span class="pl-s1">num</span>, <span class="pl-s1">segment</span>):
+        <span class="pl-k">if</span> <span class="pl-s1">num</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span>:
+            <span class="pl-k">yield</span> []
+        <span class="pl-k">elif</span> <span class="pl-s1">num</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">0</span> <span class="pl-c1">and</span> <span class="pl-s1">segment</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">0</span>:
+            <span class="pl-k">for</span> <span class="pl-s1">small_part</span> <span class="pl-c1">in</span> <span class="pl-en">yield_helper</span>(<span class="pl-s1">num</span> <span class="pl-c1">-</span> <span class="pl-s1">segment</span>, <span class="pl-s1">segment</span>):
+                <span class="pl-k">yield</span> [<span class="pl-s1">segment</span>] <span class="pl-c1">+</span> <span class="pl-s1">small_part</span>
+            <span class="pl-k">yield</span> <span class="pl-k">from</span> <span class="pl-en">yield_helper</span>(<span class="pl-s1">num</span>, <span class="pl-s1">segment</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span>)
+    <span class="pl-k">yield</span> <span class="pl-k">from</span> <span class="pl-en">yield_helper</span>(<span class="pl-s1">n</span>, <span class="pl-s1">n</span>)
+
+
+<span class="pl-k">class</span> <span class="pl-v">CucumberGame</span>:
+    <span class="pl-s">"""Play a round and return all winners so far. Cards is a list of pairs.</span>
+<span class="pl-s">    Each (who, card) pair in cards indicates who plays and what card they play.</span>
+<span class="pl-s">    &gt;&gt;&gt; g = CucumberGame()</span>
+<span class="pl-s">    &gt;&gt;&gt; g.play_round(3, [(3, 4), (0, 8), (1, 8), (2, 5)])</span>
+<span class="pl-s">    &gt;&gt;&gt; g.winners</span>
+<span class="pl-s">    [1]</span>
+<span class="pl-s">    &gt;&gt;&gt; g.play_round(1, [(3, 5), (1, 4), (2, 5), (0, 8), (3, 7), (0, 6), (1, 7)])</span>
+<span class="pl-s">    It is not your turn, player 3</span>
+<span class="pl-s">    It is not your turn, player 0</span>
+<span class="pl-s">    The round is over, player 1</span>
+<span class="pl-s">    &gt;&gt;&gt; g.winners</span>
+<span class="pl-s">    [1, 3]</span>
+<span class="pl-s">    &gt;&gt;&gt; g.play_round(3, [(3, 7), (2, 5), (0, 9)]) # Round is never completed</span>
+<span class="pl-s">    It is not your turn, player 2</span>
+<span class="pl-s">    &gt;&gt;&gt; g.winners</span>
+<span class="pl-s">    [1, 3]</span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">def</span> <span class="pl-en">__init__</span>(<span class="pl-s1">self</span>):
+        <span class="pl-s1">self</span>.<span class="pl-s1">winners</span> <span class="pl-c1">=</span> []
+        
+    <span class="pl-k">def</span> <span class="pl-en">play_round</span>(<span class="pl-s1">self</span>, <span class="pl-s1">starter</span>, <span class="pl-s1">cards</span>):
+        <span class="pl-s1">r</span> <span class="pl-c1">=</span> <span class="pl-v">Round</span>(<span class="pl-s1">starter</span>)
+        <span class="pl-k">for</span> <span class="pl-s1">who</span>, <span class="pl-s1">card</span> <span class="pl-c1">in</span> <span class="pl-s1">cards</span>:
+            <span class="pl-k">try</span>:
+                <span class="pl-s1">r</span>.<span class="pl-en">play</span>(<span class="pl-s1">who</span>, <span class="pl-s1">card</span>)
+            <span class="pl-k">except</span> <span class="pl-v">AssertionError</span> <span class="pl-k">as</span> <span class="pl-s1">e</span>:
+                <span class="pl-en">print</span>(<span class="pl-s1">e</span>)
+        <span class="pl-k">if</span> <span class="pl-s1">r</span>.<span class="pl-s1">winner</span> <span class="pl-c1">!=</span> <span class="pl-c1">None</span>:
+            <span class="pl-s1">self</span>.<span class="pl-s1">winners</span>.<span class="pl-en">append</span>(<span class="pl-s1">r</span>.<span class="pl-s1">winner</span>)
+
+
+<span class="pl-k">class</span> <span class="pl-v">Round</span>:
+    <span class="pl-s1">players</span> <span class="pl-c1">=</span> <span class="pl-c1">4</span>
+
+    <span class="pl-k">def</span> <span class="pl-en">__init__</span>(<span class="pl-s1">self</span>, <span class="pl-s1">starter</span>):
+        <span class="pl-s1">self</span>.<span class="pl-s1">starter</span> <span class="pl-c1">=</span> <span class="pl-s1">starter</span>
+        <span class="pl-s1">self</span>.<span class="pl-s1">next_player</span> <span class="pl-c1">=</span> <span class="pl-s1">starter</span>
+        <span class="pl-s1">self</span>.<span class="pl-s1">highest</span> <span class="pl-c1">=</span> <span class="pl-c1">-</span><span class="pl-c1">1</span>
+        <span class="pl-s1">self</span>.<span class="pl-s1">winner</span> <span class="pl-c1">=</span> <span class="pl-c1">None</span>
+
+    <span class="pl-k">def</span> <span class="pl-en">play</span>(<span class="pl-s1">self</span>, <span class="pl-s1">who</span>, <span class="pl-s1">card</span>):
+        <span class="pl-k">assert</span> <span class="pl-c1">not</span> <span class="pl-s1">self</span>.<span class="pl-en">is_complete</span>(), <span class="pl-s">f'The round is over, player <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">who</span><span class="pl-kos">}</span></span>'</span>
+        <span class="pl-k">assert</span> <span class="pl-s1">who</span> <span class="pl-c1">==</span> <span class="pl-s1">self</span>.<span class="pl-s1">next_player</span>, <span class="pl-s">f'It is not your turn, player <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">who</span><span class="pl-kos">}</span></span>'</span>
+        <span class="pl-s1">self</span>.<span class="pl-s1">next_player</span> <span class="pl-c1">=</span> (<span class="pl-s1">self</span>.<span class="pl-s1">next_player</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>) <span class="pl-c1">%</span> <span class="pl-v">Round</span>.<span class="pl-s1">players</span>
+        <span class="pl-k">if</span> <span class="pl-s1">card</span> <span class="pl-c1">&gt;=</span> <span class="pl-s1">self</span>.<span class="pl-s1">highest</span>:
+            <span class="pl-s1">self</span>.<span class="pl-s1">highest</span> <span class="pl-c1">=</span> <span class="pl-s1">card</span>
+            <span class="pl-s1">self</span>.<span class="pl-s1">temp</span> <span class="pl-c1">=</span> <span class="pl-s1">who</span>
+        <span class="pl-k">if</span> <span class="pl-s1">self</span>.<span class="pl-s1">next_player</span> <span class="pl-c1">==</span> <span class="pl-s1">self</span>.<span class="pl-s1">starter</span>:
+            <span class="pl-s1">self</span>.<span class="pl-s1">winner</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-s1">temp</span>
+
+            
+
+    <span class="pl-k">def</span> <span class="pl-en">is_complete</span>(<span class="pl-s1">self</span>):
+        <span class="pl-s">""" Checks if a game could end. """</span>
+        <span class="pl-k">return</span> <span class="pl-s1">self</span>.<span class="pl-s1">winner</span> <span class="pl-c1">is</span> <span class="pl-c1">not</span> <span class="pl-c1">None</span>
+
+
+<span class="pl-k">def</span> <span class="pl-en">trade</span>(<span class="pl-s1">first</span>, <span class="pl-s1">second</span>):
+    <span class="pl-s">"""Exchange the smallest prefixes of first and second that have equal sum.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; a = [1, 1, 3, 2, 1, 1, 4]</span>
+<span class="pl-s">    &gt;&gt;&gt; b = [4, 3, 2, 7]</span>
+<span class="pl-s">    &gt;&gt;&gt; trade(a, b) # Trades 1+1+3+2=7 for 4+3=7</span>
+<span class="pl-s">    'Deal!'</span>
+<span class="pl-s">    &gt;&gt;&gt; a</span>
+<span class="pl-s">    [4, 3, 1, 1, 4]</span>
+<span class="pl-s">    &gt;&gt;&gt; b</span>
+<span class="pl-s">    [1, 1, 3, 2, 2, 7]</span>
+<span class="pl-s">    &gt;&gt;&gt; c = [3, 3, 2, 4, 1]</span>
+<span class="pl-s">    &gt;&gt;&gt; trade(b, c)</span>
+<span class="pl-s">    'No deal!'</span>
+<span class="pl-s">    &gt;&gt;&gt; b</span>
+<span class="pl-s">    [1, 1, 3, 2, 2, 7]</span>
+<span class="pl-s">    &gt;&gt;&gt; c</span>
+<span class="pl-s">    [3, 3, 2, 4, 1]</span>
+<span class="pl-s">    &gt;&gt;&gt; trade(a, c)</span>
+<span class="pl-s">    'Deal!'</span>
+<span class="pl-s">    &gt;&gt;&gt; a</span>
+<span class="pl-s">    [3, 3, 2, 1, 4]</span>
+<span class="pl-s">    &gt;&gt;&gt; b</span>
+<span class="pl-s">    [1, 1, 3, 2, 2, 7]</span>
+<span class="pl-s">    &gt;&gt;&gt; c</span>
+<span class="pl-s">    [4, 3, 1, 4, 1]</span>
+<span class="pl-s">    &gt;&gt;&gt; d = [1, 1]</span>
+<span class="pl-s">    &gt;&gt;&gt; e = [2]</span>
+<span class="pl-s">    &gt;&gt;&gt; trade(d, e)</span>
+<span class="pl-s">    'Deal!'</span>
+<span class="pl-s">    &gt;&gt;&gt; d</span>
+<span class="pl-s">    [2]</span>
+<span class="pl-s">    &gt;&gt;&gt; e</span>
+<span class="pl-s">    [1, 1]</span>
+<span class="pl-s">    """</span>
+    <span class="pl-s1">m</span>, <span class="pl-s1">n</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span>, <span class="pl-c1">1</span>
+
+    <span class="pl-s1">equal_prefix</span> <span class="pl-c1">=</span> <span class="pl-k">lambda</span>: <span class="pl-en">sum</span>(<span class="pl-s1">first</span>[:<span class="pl-s1">m</span>]) <span class="pl-c1">==</span> <span class="pl-en">sum</span>(<span class="pl-s1">second</span>[:<span class="pl-s1">n</span>])
+    <span class="pl-k">while</span> <span class="pl-s1">m</span> <span class="pl-c1">&lt;=</span> <span class="pl-en">len</span>(<span class="pl-s1">first</span>) <span class="pl-c1">and</span> <span class="pl-s1">n</span> <span class="pl-c1">&lt;=</span> <span class="pl-en">len</span>(<span class="pl-s1">second</span>) <span class="pl-c1">and</span> <span class="pl-c1">not</span> <span class="pl-en">equal_prefix</span>():
+        <span class="pl-k">if</span> <span class="pl-en">sum</span>(<span class="pl-s1">first</span>[:<span class="pl-s1">m</span>]) <span class="pl-c1">&lt;</span> <span class="pl-en">sum</span>(<span class="pl-s1">second</span>[:<span class="pl-s1">n</span>]):
+            <span class="pl-s1">m</span> <span class="pl-c1">+=</span> <span class="pl-c1">1</span>
+        <span class="pl-k">else</span>:
+            <span class="pl-s1">n</span> <span class="pl-c1">+=</span> <span class="pl-c1">1</span>
+
+    <span class="pl-k">if</span> <span class="pl-en">equal_prefix</span>():
+        <span class="pl-s1">first</span>[:<span class="pl-s1">m</span>], <span class="pl-s1">second</span>[:<span class="pl-s1">n</span>] <span class="pl-c1">=</span> <span class="pl-s1">second</span>[:<span class="pl-s1">n</span>], <span class="pl-s1">first</span>[:<span class="pl-s1">m</span>]
+        <span class="pl-k">return</span> <span class="pl-s">'Deal!'</span>
+    <span class="pl-k">else</span>:
+        <span class="pl-k">return</span> <span class="pl-s">'No deal!'</span>
+
+<span class="pl-k">def</span> <span class="pl-en">card</span>(<span class="pl-s1">n</span>):
+    <span class="pl-s">"""Return the playing card numeral as a string for a positive n &lt;= 13."""</span>
+    <span class="pl-k">assert</span> <span class="pl-en">type</span>(<span class="pl-s1">n</span>) <span class="pl-c1">==</span> <span class="pl-s1">int</span> <span class="pl-c1">and</span> <span class="pl-s1">n</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">0</span> <span class="pl-c1">and</span> <span class="pl-s1">n</span> <span class="pl-c1">&lt;=</span> <span class="pl-c1">13</span>, <span class="pl-s">"Bad card n"</span>
+    <span class="pl-s1">specials</span> <span class="pl-c1">=</span> {<span class="pl-c1">1</span>: <span class="pl-s">'A'</span>, <span class="pl-c1">11</span>: <span class="pl-s">'J'</span>, <span class="pl-c1">12</span>: <span class="pl-s">'Q'</span>, <span class="pl-c1">13</span>: <span class="pl-s">'K'</span>}
+    <span class="pl-k">return</span> <span class="pl-s1">specials</span>.<span class="pl-en">get</span>(<span class="pl-s1">n</span>, <span class="pl-en">str</span>(<span class="pl-s1">n</span>))
+
+<span class="pl-k">def</span> <span class="pl-en">shuffle</span>(<span class="pl-s1">cards</span>):
+    <span class="pl-s">"""Return a shuffled list that interleaves the two halves of cards.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; shuffle(range(6))</span>
+<span class="pl-s">    [0, 3, 1, 4, 2, 5]</span>
+<span class="pl-s">    &gt;&gt;&gt; suits = ['H', 'D', 'S', 'C']</span>
+<span class="pl-s">    &gt;&gt;&gt; cards = [card(n) + suit for n in range(1,14) for suit in suits]</span>
+<span class="pl-s">    &gt;&gt;&gt; cards[:12]</span>
+<span class="pl-s">    ['AH', 'AD', 'AS', 'AC', '2H', '2D', '2S', '2C', '3H', '3D', '3S', '3C']</span>
+<span class="pl-s">    &gt;&gt;&gt; cards[26:30]</span>
+<span class="pl-s">    ['7S', '7C', '8H', '8D']</span>
+<span class="pl-s">    &gt;&gt;&gt; shuffle(cards)[:12]</span>
+<span class="pl-s">    ['AH', '7S', 'AD', '7C', 'AS', '8H', 'AC', '8D', '2H', '8S', '2D', '8C']</span>
+<span class="pl-s">    &gt;&gt;&gt; shuffle(shuffle(cards))[:12]</span>
+<span class="pl-s">    ['AH', '4D', '7S', '10C', 'AD', '4S', '7C', 'JH', 'AS', '4C', '8H', 'JD']</span>
+<span class="pl-s">    &gt;&gt;&gt; cards[:12]  # Should not be changed</span>
+<span class="pl-s">    ['AH', 'AD', 'AS', 'AC', '2H', '2D', '2S', '2C', '3H', '3D', '3S', '3C']</span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">assert</span> <span class="pl-en">len</span>(<span class="pl-s1">cards</span>) <span class="pl-c1">%</span> <span class="pl-c1">2</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span>, <span class="pl-s">'len(cards) must be even'</span>
+    <span class="pl-s1">half</span> <span class="pl-c1">=</span> <span class="pl-en">len</span>(<span class="pl-s1">cards</span>) <span class="pl-c1">//</span> <span class="pl-c1">2</span>
+    <span class="pl-s1">shuffled</span> <span class="pl-c1">=</span> []
+    <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-s1">half</span>):
+        <span class="pl-s1">shuffled</span>.<span class="pl-en">append</span>(<span class="pl-s1">cards</span>[<span class="pl-s1">i</span>])
+        <span class="pl-s1">shuffled</span>.<span class="pl-en">append</span>(<span class="pl-s1">cards</span>[<span class="pl-s1">i</span> <span class="pl-c1">+</span> <span class="pl-s1">half</span>])
+    <span class="pl-k">return</span> <span class="pl-s1">shuffled</span>
+
+
+<span class="pl-k">def</span> <span class="pl-en">link_pop</span>(<span class="pl-s1">lnk</span>, <span class="pl-s1">index</span><span class="pl-c1">=</span><span class="pl-c1">-</span><span class="pl-c1">1</span>):
+    <span class="pl-s">'''Implement the pop method for a Linked List.</span>
+<span class="pl-s">    </span>
+<span class="pl-s">    &gt;&gt;&gt; lnk = Link(1, Link(2, Link(3, Link(4, Link(5)))))</span>
+<span class="pl-s">    &gt;&gt;&gt; removed = link_pop(lnk)</span>
+<span class="pl-s">    &gt;&gt;&gt; print(removed)</span>
+<span class="pl-s">    5</span>
+<span class="pl-s">    &gt;&gt;&gt; print(lnk)</span>
+<span class="pl-s">    &lt;1 2 3 4&gt;</span>
+<span class="pl-s">    &gt;&gt;&gt; link_pop(lnk, 2)</span>
+<span class="pl-s">    3</span>
+<span class="pl-s">    &gt;&gt;&gt; print(lnk)</span>
+<span class="pl-s">    &lt;1 2 4&gt;</span>
+<span class="pl-s">    &gt;&gt;&gt; link_pop(lnk)</span>
+<span class="pl-s">    4</span>
+<span class="pl-s">    &gt;&gt;&gt; link_pop(lnk)</span>
+<span class="pl-s">    2</span>
+<span class="pl-s">    &gt;&gt;&gt; print(lnk)</span>
+<span class="pl-s">    &lt;1&gt;</span>
+<span class="pl-s">    '''</span>
+    <span class="pl-k">if</span> <span class="pl-s1">index</span> <span class="pl-c1">==</span> <span class="pl-c1">-</span><span class="pl-c1">1</span>:
+        <span class="pl-k">while</span> <span class="pl-c1">not</span> <span class="pl-s1">lnk</span>.<span class="pl-s1">rest</span>.<span class="pl-s1">rest</span> <span class="pl-c1">is</span> <span class="pl-v">Link</span>.<span class="pl-s1">empty</span>:
+            <span class="pl-s1">lnk</span> <span class="pl-c1">=</span> <span class="pl-s1">lnk</span>.<span class="pl-s1">rest</span>
+        <span class="pl-s1">removed</span> <span class="pl-c1">=</span> <span class="pl-s1">lnk</span>.<span class="pl-s1">rest</span>.<span class="pl-s1">first</span>
+        <span class="pl-s1">lnk</span>.<span class="pl-s1">rest</span> <span class="pl-c1">=</span> <span class="pl-s1">lnk</span>.<span class="pl-s1">rest</span>.<span class="pl-s1">rest</span>
+    <span class="pl-k">else</span>:
+        <span class="pl-k">while</span> <span class="pl-s1">index</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">1</span>:
+            <span class="pl-s1">lnk</span> <span class="pl-c1">=</span> <span class="pl-s1">lnk</span>.<span class="pl-s1">rest</span>
+            <span class="pl-s1">index</span> <span class="pl-c1">-=</span> <span class="pl-c1">1</span>
+        <span class="pl-s1">removed</span> <span class="pl-c1">=</span> <span class="pl-s1">lnk</span>.<span class="pl-s1">rest</span>.<span class="pl-s1">first</span>
+        <span class="pl-s1">lnk</span>.<span class="pl-s1">rest</span> <span class="pl-c1">=</span> <span class="pl-s1">lnk</span>.<span class="pl-s1">rest</span>.<span class="pl-s1">rest</span>
+    <span class="pl-k">return</span> <span class="pl-s1">removed</span>
+        
+
+<span class="pl-k">def</span> <span class="pl-en">deep_len</span>(<span class="pl-s1">lnk</span>):
+    <span class="pl-s">""" Returns the deep length of a possibly deep linked list.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; deep_len(Link(1, Link(2, Link(3))))</span>
+<span class="pl-s">    3</span>
+<span class="pl-s">    &gt;&gt;&gt; deep_len(Link(Link(1, Link(2)), Link(3, Link(4))))</span>
+<span class="pl-s">    4</span>
+<span class="pl-s">    &gt;&gt;&gt; levels = Link(Link(Link(1, Link(2)), Link(3)), Link(Link(4), Link(5)))</span>
+<span class="pl-s">    &gt;&gt;&gt; print(levels)</span>
+<span class="pl-s">    &lt;&lt;&lt;1 2&gt; 3&gt; &lt;4&gt; 5&gt;</span>
+<span class="pl-s">    &gt;&gt;&gt; deep_len(levels)</span>
+<span class="pl-s">    5</span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">if</span> <span class="pl-s1">lnk</span> <span class="pl-c1">is</span> <span class="pl-v">Link</span>.<span class="pl-s1">empty</span>:
+        <span class="pl-k">return</span> <span class="pl-c1">0</span>
+    <span class="pl-k">elif</span> <span class="pl-c1">not</span> <span class="pl-en">isinstance</span>(<span class="pl-s1">lnk</span>, <span class="pl-v">Link</span>):
+        <span class="pl-k">return</span> <span class="pl-c1">1</span>
+    <span class="pl-k">else</span>:
+        <span class="pl-k">return</span> <span class="pl-en">deep_len</span>(<span class="pl-s1">lnk</span>.<span class="pl-s1">first</span>) <span class="pl-c1">+</span> <span class="pl-en">deep_len</span>(<span class="pl-s1">lnk</span>.<span class="pl-s1">rest</span>)
+
+
+<span class="pl-k">def</span> <span class="pl-en">every_other</span>(<span class="pl-s1">s</span>):
+    <span class="pl-s">"""Mutates a linked list so that all the odd-indiced elements are removed</span>
+<span class="pl-s">    (using 0-based indexing).</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; s = Link(1, Link(2, Link(3, Link(4))))</span>
+<span class="pl-s">    &gt;&gt;&gt; every_other(s)</span>
+<span class="pl-s">    &gt;&gt;&gt; s</span>
+<span class="pl-s">    Link(1, Link(3))</span>
+<span class="pl-s">    &gt;&gt;&gt; odd_length = Link(5, Link(3, Link(1)))</span>
+<span class="pl-s">    &gt;&gt;&gt; every_other(odd_length)</span>
+<span class="pl-s">    &gt;&gt;&gt; odd_length</span>
+<span class="pl-s">    Link(5, Link(1))</span>
+<span class="pl-s">    &gt;&gt;&gt; singleton = Link(4)</span>
+<span class="pl-s">    &gt;&gt;&gt; every_other(singleton)</span>
+<span class="pl-s">    &gt;&gt;&gt; singleton</span>
+<span class="pl-s">    Link(4)</span>
+<span class="pl-s">    """</span>
+    <span class="pl-k">if</span> <span class="pl-s1">s</span> <span class="pl-c1">is</span> <span class="pl-v">Link</span>.<span class="pl-s1">empty</span> <span class="pl-c1">or</span> <span class="pl-s1">s</span>.<span class="pl-s1">rest</span> <span class="pl-c1">is</span> <span class="pl-v">Link</span>.<span class="pl-s1">empty</span>:
+        <span class="pl-k">return</span>
+    <span class="pl-s1">s</span>.<span class="pl-s1">rest</span> <span class="pl-c1">=</span> <span class="pl-s1">s</span>.<span class="pl-s1">rest</span>.<span class="pl-s1">rest</span>
+    <span class="pl-en">every_other</span>(<span class="pl-s1">s</span>.<span class="pl-s1">rest</span>)
+
+
+<span class="pl-k">class</span> <span class="pl-v">Link</span>:
+    <span class="pl-s">"""A linked list.</span>
+<span class="pl-s"></span>
+<span class="pl-s">    &gt;&gt;&gt; s = Link(1)</span>
+<span class="pl-s">    &gt;&gt;&gt; s.first</span>
+<span class="pl-s">    1</span>
+<span class="pl-s">    &gt;&gt;&gt; s.rest is Link.empty</span>
+<span class="pl-s">    True</span>
+<span class="pl-s">    &gt;&gt;&gt; s = Link(2, Link(3, Link(4)))</span>
+<span class="pl-s">    &gt;&gt;&gt; s.first = 5</span>
+<span class="pl-s">    &gt;&gt;&gt; s.rest.first = 6</span>
+<span class="pl-s">    &gt;&gt;&gt; s.rest.rest = Link.empty</span>
+<span class="pl-s">    &gt;&gt;&gt; s                                    # Displays the contents of repr(s)</span>
+<span class="pl-s">    Link(5, Link(6))</span>
+<span class="pl-s">    &gt;&gt;&gt; s.rest = Link(7, Link(Link(8, Link(9))))</span>
+<span class="pl-s">    &gt;&gt;&gt; s</span>
+<span class="pl-s">    Link(5, Link(7, Link(Link(8, Link(9)))))</span>
+<span class="pl-s">    &gt;&gt;&gt; print(s)                             # Prints str(s)</span>
+<span class="pl-s">    &lt;5 7 &lt;8 9&gt;&gt;</span>
+<span class="pl-s">    """</span>
+    <span class="pl-s1">empty</span> <span class="pl-c1">=</span> ()
+
+    <span class="pl-k">def</span> <span class="pl-en">__init__</span>(<span class="pl-s1">self</span>, <span class="pl-s1">first</span>, <span class="pl-s1">rest</span><span class="pl-c1">=</span><span class="pl-s1">empty</span>):
+        <span class="pl-k">assert</span> <span class="pl-s1">rest</span> <span class="pl-c1">is</span> <span class="pl-v">Link</span>.<span class="pl-s1">empty</span> <span class="pl-c1">or</span> <span class="pl-en">isinstance</span>(<span class="pl-s1">rest</span>, <span class="pl-v">Link</span>)
+        <span class="pl-s1">self</span>.<span class="pl-s1">first</span> <span class="pl-c1">=</span> <span class="pl-s1">first</span>
+        <span class="pl-s1">self</span>.<span class="pl-s1">rest</span> <span class="pl-c1">=</span> <span class="pl-s1">rest</span>
+
+    <span class="pl-k">def</span> <span class="pl-en">__repr__</span>(<span class="pl-s1">self</span>):
+        <span class="pl-k">if</span> <span class="pl-s1">self</span>.<span class="pl-s1">rest</span> <span class="pl-c1">is</span> <span class="pl-c1">not</span> <span class="pl-v">Link</span>.<span class="pl-s1">empty</span>:
+            <span class="pl-s1">rest_repr</span> <span class="pl-c1">=</span> <span class="pl-s">', '</span> <span class="pl-c1">+</span> <span class="pl-en">repr</span>(<span class="pl-s1">self</span>.<span class="pl-s1">rest</span>)
+        <span class="pl-k">else</span>:
+            <span class="pl-s1">rest_repr</span> <span class="pl-c1">=</span> <span class="pl-s">''</span>
+        <span class="pl-k">return</span> <span class="pl-s">'Link('</span> <span class="pl-c1">+</span> <span class="pl-en">repr</span>(<span class="pl-s1">self</span>.<span class="pl-s1">first</span>) <span class="pl-c1">+</span> <span class="pl-s1">rest_repr</span> <span class="pl-c1">+</span> <span class="pl-s">')'</span>
+
+    <span class="pl-k">def</span> <span class="pl-en">__str__</span>(<span class="pl-s1">self</span>):
+        <span class="pl-s1">string</span> <span class="pl-c1">=</span> <span class="pl-s">'&lt;'</span>
+        <span class="pl-k">while</span> <span class="pl-s1">self</span>.<span class="pl-s1">rest</span> <span class="pl-c1">is</span> <span class="pl-c1">not</span> <span class="pl-v">Link</span>.<span class="pl-s1">empty</span>:
+            <span class="pl-s1">string</span> <span class="pl-c1">+=</span> <span class="pl-en">str</span>(<span class="pl-s1">self</span>.<span class="pl-s1">first</span>) <span class="pl-c1">+</span> <span class="pl-s">' '</span>
+            <span class="pl-s1">self</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-s1">rest</span>
+        <span class="pl-k">return</span> <span class="pl-s1">string</span> <span class="pl-c1">+</span> <span class="pl-en">str</span>(<span class="pl-s1">self</span>.<span class="pl-s1">first</span>) <span class="pl-c1">+</span> <span class="pl-s">'&gt;'</span>
+
+</pre></div></div>
 <div style="font-size:small;margin-top:8px;float:right;">转载请注明出处</div>
 
 <button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
