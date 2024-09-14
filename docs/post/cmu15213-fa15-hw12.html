@@ -275,35 +275,34 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 }</pre></div>
 <h2>12.37</h2>
 <p>🐝 利用生产消费者 <code class="notranslate">sbuf.c</code></p>
-<div class="highlight highlight-source-c++"><pre class="notranslate">#<span class="pl-k">define</span> <span class="pl-en">SBUFSIZE</span> <span class="pl-c1">64</span>;
-#<span class="pl-k">define</span> <span class="pl-en">NTHREADS</span> <span class="pl-c1">16</span>
-<span class="pl-k">static</span> <span class="pl-c1">sbuf_t</span> sbuf;
+<div class="highlight highlight-source-c++"><pre class="notranslate">#define SBUFSIZE 64;
+#define NTHREADS 16
+static sbuf_t sbuf;
 
-<span class="pl-k">void</span>* <span class="pl-en">thread</span>(<span class="pl-k">void</span> *vargp) {
-    <span class="pl-c1">Pthread_detach</span>(<span class="pl-c1">pthread_self</span>());
-    <span class="pl-k">while</span> (<span class="pl-c1">1</span>) {
-        <span class="pl-c"><span class="pl-c">//</span> 此时若是有还没处理的connfd，则继续，否则阻塞</span>
-        <span class="pl-k">int</span> connfd = <span class="pl-c1">sbuf_remove</span>(&amp;sbuf);
-        <span class="pl-c1">doit</span>(connfd);
-        <span class="pl-c1">Close</span>(connfd);
+void* thread(void *vargp) {
+    Pthread_detach(pthread_self());
+    while (1) {
+        // 此时若是有还没处理的connfd，则继续，否则阻塞
+        int connfd = sbuf_remove(&amp;sbuf);
+        doit(connfd);
+        Close(connfd);
     }
 }
 
-<span class="pl-k">int</span> <span class="pl-en">main</span>(<span class="pl-k">int</span> argc, <span class="pl-k">char</span> **argv) {
-    <span class="pl-c"><span class="pl-c">//</span> 初始化Sbuf</span>
-    <span class="pl-c1">sbuf_init</span>(&amp;sbuf, SBUFFSIZE);
-    <span class="pl-c"><span class="pl-c">//</span> 创建多个线程去处理客户端请求</span>
+int main(int argc, char **argv) {
+    // 初始化Sbuf
+    sbuf_init(&amp;sbuf, SBUFFSIZE);
+    // 创建多个线程去处理客户端请求
    pthread tid[NTHREADS];
-    <span class="pl-k">for</span> (<span class="pl-c1">size_t</span> i = <span class="pl-c1">0</span>; i &lt; NTHREADS; i++) {
-        <span class="pl-c1">Pthread_create</span>(&amp;tid[i], <span class="pl-c1">NULL</span>, thread, <span class="pl-c1">NULL</span>);
+    for (size_t i = 0; i &lt; NTHREADS; i++) {
+        Pthread_create(&amp;tid[i], NULL, thread, NULL);
     }
     
-    <span class="pl-k">while</span> (<span class="pl-c1">1</span>) {
-        <span class="pl-c"><span class="pl-c">//</span> 若是有空余插槽则插入，否则阻塞</span>
-        <span class="pl-c1">sbuf_insert</span>(&amp;sbuf, connfd);
+    while (1) {
+        // 若是有空余插槽则插入，否则阻塞
+        sbuf_insert(&amp;sbuf, connfd);
     }
-}
-</pre></div></div>
+}</pre></div></div>
 <div style="font-size:small;margin-top:8px;float:right;">转载请注明出处</div>
 
 <button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
